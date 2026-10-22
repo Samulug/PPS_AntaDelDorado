@@ -6,17 +6,26 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
+            // Mantenemos 'id' para compatibilidad nativa con Sanctum y Spatie
+            $table->id(); 
+            $table->string('id_microsoft_entra')->nullable()->unique();
+            $table->string('nombre_completo');
+            $table->integer('dni')->unique();
+            $table->integer('legajo')->unique();
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
+            $table->string('rol', 50)->default('Operario'); // SuperAdmin, Lic_RRHH, Lic_HyS, Supervisor, Operario
+            $table->json('permisos_json')->nullable();
+            $table->string('centro_costo', 100)->default('CC-101');
+            $table->string('zona_geografica_establecimient', 100)->default('Las Lajitas'); // Las Lajitas, Anta, Coronel Mollinedo, Laguna Verde
+            $table->string('estado_operativo', 50)->default('Activo'); // Activo, Inactivo, Vacaciones, Lesionado, Enfermo, Siniestrado
+            $table->date('fecha_ingreso')->default(now());
+            $table->string('fcm_token')->nullable();
+            $table->string('foto')->nullable(); // Para avatar con Storage::disk('public')
             $table->rememberToken();
             $table->timestamps();
         });
@@ -37,9 +46,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('users');
