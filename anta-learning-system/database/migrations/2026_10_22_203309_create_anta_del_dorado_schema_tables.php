@@ -14,7 +14,8 @@ return new class extends Migration
             $table->string('nombre_cuadrilla');
             $table->string('labor_asociada');
             $table->date('fecha_creacion')->default(now());
-            $table->boolean('estado')->default(true);
+            $table->string('estado', 30)->default('Borrador');
+            $table->json('cursos_borrador_json')->nullable();
             $table->timestamps();
         });
 

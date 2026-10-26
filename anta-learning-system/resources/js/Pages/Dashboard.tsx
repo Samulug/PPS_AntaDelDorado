@@ -429,53 +429,50 @@ export default function Dashboard({
                     />
                 </div>
 
-                <div className="overflow-x-auto">
-                    <table className="w-full border-collapse text-left">
+                <div className="w-full">
+                    <table className="w-full table-fixed border-collapse text-left">
                         <thead>
-                            <tr className="border-b border-[#E9E9E7] dark:border-[#2A302B]">
-                                <th className="py-3 px-7 text-[13px] font-medium text-[#6B7280] dark:text-[#9AA39D] whitespace-nowrap">
-                                    Colaborador
+                            <tr className="border-b border-[#E9E9E7] dark:border-[#2A302B] bg-[#F7F7F6]/60 dark:bg-[#141714]/50">
+                                <th className="w-[32%] py-3 px-5 text-[13px] font-medium text-[#6B7280] dark:text-[#9AA39D]">
+                                    Colaborador y Legajo
                                 </th>
-                                <th className="py-3 px-7 text-[13px] font-medium text-[#6B7280] dark:text-[#9AA39D] whitespace-nowrap">
-                                    Nodo
+                                <th className="w-[36%] py-3 px-4 text-[13px] font-medium text-[#6B7280] dark:text-[#9AA39D]">
+                                    Curso y Nodo Productivo
                                 </th>
-                                <th className="py-3 px-7 text-[13px] font-medium text-[#6B7280] dark:text-[#9AA39D] whitespace-nowrap">
-                                    Curso
+                                <th className="w-[16%] py-3 px-4 text-[13px] font-medium text-[#6B7280] dark:text-[#9AA39D]">
+                                    Estado
                                 </th>
-                                <th className="py-3 px-7 text-[13px] font-medium text-[#6B7280] dark:text-[#9AA39D] whitespace-nowrap">
-                                    Estado / Alerta
-                                </th>
-                                <th className="py-3 px-7 text-[13px] font-medium text-[#6B7280] dark:text-[#9AA39D] text-right whitespace-nowrap">
+                                <th className="w-[16%] py-3 px-5 text-[13px] font-medium text-[#6B7280] dark:text-[#9AA39D] text-right">
                                     Acción
                                 </th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-[#E9E9E7] dark:divide-[#2A302B] text-[15px]">
+                        <tbody className="divide-y divide-[#E9E9E7] dark:divide-[#2A302B] text-[14px]">
                             {filasFiltradas.length > 0 ? (
                                 filasFiltradas.map((item) => {
-                                    const nombre =
-                                        item.usuario?.nombre_completo ?? 'Colaborador';
+                                    const nombre = item.usuario?.nombre_completo ?? 'Colaborador';
                                     return (
                                         <tr
                                             key={item.id_progreso}
                                             className="hover:bg-[#F7F7F6] dark:hover:bg-[#141714] transition-colors"
                                         >
-                                            <td className="py-4 px-7 whitespace-nowrap">
-                                                <b className="font-semibold text-[#1F2328] dark:text-[#ECEFEC]">
+                                            <td className="py-3.5 px-5 align-middle">
+                                                <b className="font-semibold text-[#1F2328] dark:text-[#ECEFEC] block truncate">
                                                     {nombre}
                                                 </b>
-                                                <span className="block text-[12px] text-[#6B7280] dark:text-[#9AA39D]">
+                                                <span className="text-[12px] text-[#6B7280] dark:text-[#9AA39D]">
                                                     Legajo #{item.usuario?.legajo ?? '-'}
                                                 </span>
                                             </td>
-                                            <td className="py-4 px-7 whitespace-nowrap text-[#1F2328] dark:text-[#ECEFEC]">
-                                                {item.usuario?.zona_geografica_establecimient ??
-                                                    'Las Lajitas'}
+                                            <td className="py-3.5 px-4 align-middle">
+                                                <span className="font-medium text-[#1F2328] dark:text-[#ECEFEC] block truncate">
+                                                    {item.curso?.nombre ?? 'Curso asignado'}
+                                                </span>
+                                                <span className="text-[12px] text-[#6B7280] dark:text-[#9AA39D] block truncate">
+                                                    Nodo: {item.usuario?.zona_geografica_establecimient ?? 'Las Lajitas'}
+                                                </span>
                                             </td>
-                                            <td className="py-4 px-7 whitespace-nowrap text-[#1F2328] dark:text-[#ECEFEC]">
-                                                {item.curso?.nombre ?? 'Curso asignado'}
-                                            </td>
-                                            <td className="py-4 px-7 whitespace-nowrap">
+                                            <td className="py-3.5 px-4 align-middle">
                                                 <span
                                                     className={`inline-block rounded-full px-2.5 py-0.5 text-[12px] font-medium ${
                                                         item.estado === 'Bloqueado'
@@ -484,21 +481,19 @@ export default function Dashboard({
                                                     }`}
                                                 >
                                                     {item.estado === 'Bloqueado'
-                                                        ? 'Bloqueado (3 intentos)'
+                                                        ? 'Bloqueado (3 int.)'
                                                         : item.estado}
                                                 </span>
                                             </td>
-                                            <td className="py-4 px-7 whitespace-nowrap text-right">
+                                            <td className="py-3.5 px-5 align-middle text-right">
                                                 <button
                                                     type="button"
                                                     onClick={() =>
-                                                        mostrarToast(
-                                                            `Recordatorio enviado a ${nombre}`
-                                                        )
+                                                        mostrarToast(`Recordatorio enviado a ${nombre}`)
                                                     }
-                                                    className="min-h-[32px] rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] px-3 py-1 text-[14px] font-medium text-[#1F2328] dark:text-[#ECEFEC] hover:bg-[#F7F7F6] dark:hover:bg-[#141714] transition-colors cursor-pointer"
+                                                    className="min-h-[30px] rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] px-2.5 py-1 text-[13px] font-medium text-[#1F2328] dark:text-[#ECEFEC] hover:bg-[#F7F7F6] dark:hover:bg-[#141714] transition-colors cursor-pointer"
                                                 >
-                                                    Enviar recordatorio
+                                                    Recordar
                                                 </button>
                                             </td>
                                         </tr>
@@ -506,10 +501,7 @@ export default function Dashboard({
                                 })
                             ) : (
                                 <tr>
-                                    <td
-                                        colSpan={5}
-                                        className="py-6 px-7 text-[#6B7280] dark:text-[#9AA39D]"
-                                    >
+                                    <td colSpan={4} className="py-6 px-7 text-[#6B7280] dark:text-[#9AA39D]">
                                         Sin demoras ni bloqueos registrados con estos filtros.
                                     </td>
                                 </tr>

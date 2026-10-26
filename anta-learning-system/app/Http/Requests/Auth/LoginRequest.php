@@ -50,6 +50,15 @@ class LoginRequest extends FormRequest
             ]);
         }
 
+        $user = Auth::user();
+        if ($user->rol === 'Operario') {
+            Auth::guard('web')->logout();
+            
+            throw ValidationException::withMessages([
+                'email' => 'Acceso denegado: Tu perfil es de Operario. Por favor, inicia sesión desde la aplicación móvil.',
+            ]);
+        }
+
         RateLimiter::clear($this->throttleKey());
     }
 

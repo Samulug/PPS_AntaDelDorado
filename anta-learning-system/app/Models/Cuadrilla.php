@@ -14,11 +14,12 @@ class Cuadrilla extends Model
         'labor_asociada',
         'fecha_creacion',
         'estado',
+        'cursos_borrador_json', 
     ];
 
     protected $casts = [
         'fecha_creacion' => 'date',
-        'estado' => 'boolean',
+        'cursos_borrador_json' => 'array',
     ];
 
     public function colaboradores()

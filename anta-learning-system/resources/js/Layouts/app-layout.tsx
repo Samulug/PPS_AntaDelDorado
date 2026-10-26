@@ -15,6 +15,7 @@ import {
     LogOut,
     Menu,
     X,
+    HardHat,
 } from 'lucide-react';
 
 interface AppLayoutProps {
@@ -29,12 +30,20 @@ export default function AppLayout({
     title,
 }: AppLayoutProps) {
     const { url } = usePage();
-    const { auth } = usePage<any>().props;
+    const { auth, filters } = usePage<any>().props;
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [globalSearch, setGlobalSearch] = useState('');
+    const [globalSearch, setGlobalSearch] = useState(filters?.search || '');
     const [isDark, setIsDark] = useState(false);
 
-    // Sincronizar con el tema del documento
+    useEffect(() => {
+        if (filters?.search !== undefined) {
+            setGlobalSearch(filters.search || '');
+        } else if (!url.startsWith('/colaboradores')) {
+            // Si navegamos a otra sección (ej. Cursos o Inicio), limpiamos la barra superior
+            setGlobalSearch('');
+        }
+    }, [filters?.search, url]);
+
     useEffect(() => {
         const root = document.documentElement;
         setIsDark(root.classList.contains('dark'));
@@ -53,12 +62,19 @@ export default function AppLayout({
 
     // Búsqueda rápida en la barra superior (redirige a Colaboradores al presionar Enter)
     const handleGlobalSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter' && globalSearch.trim() !== '') {
-            router.get('/colaboradores', { buscar: globalSearch.trim() });
+        if (e.key === 'Enter') {
+            const query = globalSearch.trim();
+            router.get(
+                '/colaboradores',
+                query ? { search: query } : {},
+                {
+                    preserveState: url.startsWith('/colaboradores'),
+                    preserveScroll: url.startsWith('/colaboradores'),
+                }
+            );
         }
     };
 
-    // Navegación calcada del prototipo HTML
     const navigation = [
         {
             name: 'Inicio',
@@ -76,7 +92,13 @@ export default function AppLayout({
             name: 'Colaboradores',
             href: '/colaboradores',
             icon: Users,
-            current: url.startsWith('/colaboradores') || url.startsWith('/cuadrillas'),
+            current: url.startsWith('/colaboradores')
+        },
+        {
+            name: 'Cuadrillas',
+            href: '/cuadrillas',
+            icon: HardHat,
+            current: url.startsWith('/cuadrillas'),
         },
         {
             name: 'Consultas',
@@ -119,8 +141,7 @@ export default function AppLayout({
         <div className="min-h-screen bg-[#F7F7F6] dark:bg-[#141714] text-[#1F2328] dark:text-[#ECEFEC] font-sans antialiased selection:bg-[#EDF4F1] selection:text-[#2F6F5E]">
             {title && <Head title={`${title} · Panel de RRHH`} />}
 
-            {/* TOPBAR SUPERIOR (Estilo exacto del prototipo: 60px alto, borde inferior suave) */}
-            <header className="sticky top-0 z-30 flex h-[60px] items-center gap-5 bg-white dark:bg-[#1B1F1C] border-b border-[#E9E9E7] dark:border-[#2A302B] px-4 md:px-8">
+            <header className="sticky top-0 z-30 flex h-[60px] items-center gap-20 bg-white dark:bg-[#1B1F1C] border-b border-[#E9E9E7] dark:border-[#2A302B] px-4 md:px-8">
                 <button
                     type="button"
                     onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -155,8 +176,8 @@ export default function AppLayout({
                     </div>
                 </div>
 
-                {/* Controles derechos: Botón Tema + Usuario + Avatar + Salir */}
-                <div className="flex items-center gap-3.5">
+                {/*Botón Tema + Usuario + Avatar + Salir */}
+                <div className="flex items-center gap-4">
                     <button
                         type="button"
                         onClick={toggleTheme}
@@ -166,19 +187,17 @@ export default function AppLayout({
                         {isDark ? (
                             <>
                                 <Sun className="h-3.5 w-3.5 text-[#E3A15A]" />
-                                <span>Tema</span>
                             </>
                         ) : (
                             <>
                                 <Moon className="h-3.5 w-3.5 text-[#6B7280]" />
-                                <span>Tema</span>
                             </>
                         )}
                     </button>
 
                     <Link
                         href="/profile"
-                        className="hidden sm:block text-right leading-[1.2] cursor-pointer"
+                        className="hidden sm:block text-right leading-[1] cursor-pointer"
                     >
                         <b className="text-[14px] font-semibold text-[#1F2328] dark:text-[#ECEFEC] block">
                             {nombreUsuario}
@@ -191,7 +210,7 @@ export default function AppLayout({
                     <Link
                         href="/profile"
                         aria-label="Mi perfil"
-                        className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-[#EDF4F1] dark:bg-[#223029] text-[#2F6F5E] dark:text-[#6FBFA5] font-semibold text-[13px]"
+                        className="grid h-[39px] w-[39px] shrink-0 place-items-center rounded-full bg-[#EDF4F1] dark:bg-[#223029] text-[#2F6F5E] dark:text-[#6FBFA5] font-semibold text-[13px]"
                     >
                         {iniciales}
                     </Link>
@@ -256,7 +275,7 @@ export default function AppLayout({
                 </aside>
 
                 {/* ÁREA CENTRAL DE TRABAJO */}
-                <main className="w-full max-w-[1200px] px-4 py-6 sm:px-8 md:px-14 md:py-11 md:pb-16">
+                <main className="w-full max-w-[1200px] px-4 py-6 sm:px-8 md:px-14 ">
                     {children}
                 </main>
             </div>
