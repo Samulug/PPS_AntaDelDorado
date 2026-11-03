@@ -14,7 +14,7 @@ use Inertia\Response;
 class CuadrillaController extends Controller
 {
     /**
-     * Renderiza la página dedicada exclusivamente a Cuadrillas de Entrenamiento.
+     * Renderiza la página dedicada exclusivamente a cuadrillas de Entrenamiento.
      */
     public function index(): Response
     {
@@ -41,7 +41,7 @@ class CuadrillaController extends Controller
             ->orderBy('nombre')
             ->get(['id_curso', 'nombre', 'descripcion', 'tiempo_vigencia']);
 
-        return Inertia::render('Cuadrillas/Index', [
+        return Inertia::render('cuadrillas/index', [
             'cuadrillas'        => $cuadrillas,
             'users'             => $users,
             'cursosDisponibles' => $cursosDisponibles,
@@ -207,7 +207,7 @@ class CuadrillaController extends Controller
             ->orderBy('nombre')
             ->get(['id_curso', 'nombre', 'descripcion']);
 
-        return Inertia::render('Cuadrillas/Create', [
+        return Inertia::render('cuadrillas/create', [
             'users'             => $users,
             'cursosDisponibles' => $cursosDisponibles,
         ]);
@@ -240,7 +240,7 @@ class CuadrillaController extends Controller
             ->orderBy('nombre')
             ->get(['id_curso', 'nombre', 'descripcion']);
 
-        return Inertia::render('Cuadrillas/Update', [
+        return Inertia::render('cuadrillas/update', [
             'cuadrillaEditable' => $cuadrilla,
             'users'             => $users,
             'cursosDisponibles' => $cursosDisponibles,

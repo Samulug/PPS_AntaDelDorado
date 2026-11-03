@@ -16,11 +16,6 @@ class Opcion extends Model
         'es_correcta',
     ];
 
-    // Ocultamos es_correcta por defecto al serializar a JSON para proteger el examen en móvil
-    protected $hidden = [
-        'es_correcta',
-    ];
-
     protected $casts = [
         'es_correcta' => 'boolean',
     ];

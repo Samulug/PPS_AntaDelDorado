@@ -20,7 +20,7 @@ class UserController extends Controller
     {
         $query = User::with('roles:id,name')
             // Filtramos para no mostrar al SuperAdmin en la tabla operativa si es necesario
-            ->select('id', 'nombre_completo', 'dni', 'legajo', 'email', 'rol', 'zona_geografica_establecimient', 'estado_operativo')
+            ->select('id', 'nombre_completo', 'dni', 'legajo', 'email', 'rol', 'zona_geografica_establecimient','centro_costo' ,'estado_operativo')
             ->whereIn('rol', ['Operario', 'Supervisor']);
 
         if ($request->filled('search')) {
@@ -37,17 +37,15 @@ class UserController extends Controller
             });
         }
 
-        $cuadrillas = \App\Models\Cuadrilla::with([
-            'colaboradores:id,nombre_completo,dni,legajo,rol,zona_geografica_establecimient,estado_operativo'
-        ])->orderBy('id_cuadrilla', 'desc')->get();
-
-        $cursosDisponibles = \App\Models\Curso::where('estado_curso', 'Activo')
-            ->get(['id_curso', 'nombre']);
-
-        return Inertia::render('Colaboradores/Index', [
+        return Inertia::render('colaboradores/index', [
             'users' => $query->get(),
             'filters' => $request->only('search')
         ]);
+    }
+
+    public function create(): Response
+    {
+        return Inertia::render('colaboradores/create');
     }
 
     /**
@@ -65,52 +63,86 @@ class UserController extends Controller
             'centro_costo' => 'required|string', // Departamento (ej. Cosecha, Empaque)
         ]);
 
-        // Estrategia: Contraseña por defecto (DNI)
         $validated['password'] = Hash::make($validated['dni']);
-        
-        // Asignación de estados iniciales
         $validated['estado_operativo'] = 'Activo';
         $validated['fecha_ingreso'] = now();
-        
-        // Flag booleano para disparar la pantalla bloqueante en Flutter
         $validated['must_change_password'] = true; 
 
         $user = User::create($validated);
         $user->assignRole($validated['rol']);
 
-        return redirect()->back()->with('success', 'Colaborador dado de alta exitosamente. Su contraseña inicial es su DNI.');
+        return redirect()->route('colaboradores.index')
+            ->with('success', 'Colaborador dado de alta exitosamente. Su contraseña inicial es su DNI.');
+    }
+
+    public function show($id): Response
+    {
+        $colaborador = User::with([
+            'progresos.curso:id_curso,nombre',
+            'cuadrillas:id_cuadrilla,nombre_cuadrilla',
+        ])->findOrFail($id);
+
+        return Inertia::render('colaboradores/show', [
+            'colaborador' => $colaborador,
+        ]);
+    }
+
+public function edit($id): Response
+    {
+        $colaborador = User::findOrFail($id);
+
+        return Inertia::render('colaboradores/update', [
+            'colaborador' => $colaborador,
+        ]);
     }
 
     /**
-     * Da de baja o suspende a un colaborador (Despido, renuncia, etc.)
-     * Reemplaza el destroy() para mantener el historial de auditoría intacto.
+     * Actualiza y redirige de vuelta al Show con mensaje de confirmación.
      */
-    public function updateStatus(Request $request, User $user): RedirectResponse
+    public function update(Request $request, $id): RedirectResponse
     {
+        $user = User::findOrFail($id);
+
         $validated = $request->validate([
-            // Estados basados en el prototipo y modelo de datos
-            'estado_operativo' => ['required', Rule::in(['Activo', 'Inactivo', 'Suspendido', 'Vacaciones', 'Lesionado', 'Siniestrado'])]
+            'nombre_completo'                => 'required|string|max:255',
+            'dni'                            => ['required', 'integer', Rule::unique('users', 'dni')->ignore($user->id)],
+            'legajo'                         => ['required', 'integer', Rule::unique('users', 'legajo')->ignore($user->id)],
+            'email'                          => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'rol'                            => ['required', Rule::in(['Operario', 'Supervisor'])],
+            'zona_geografica_establecimient' => 'required|string',
+            'centro_costo'                   => 'required|string',
+            'estado_operativo'               => ['required', Rule::in(['Activo', 'Inactivo', 'Suspendido', 'Vacaciones', 'Lesionado', 'Siniestrado'])],
+        ]);
+
+        $user->update($validated);
+        $user->syncRoles([$validated['rol']]);
+
+        return redirect()->route('colaboradores.show', $user->id)
+            ->with('success', 'Datos del colaborador actualizados correctamente.');
+    }
+
+    public function updateStatus(Request $request, $id): RedirectResponse
+    {
+        $user = User::findOrFail($id);
+
+        $validated = $request->validate([
+            'estado_operativo' => ['required', Rule::in(['Activo', 'Inactivo', 'Suspendido', 'Vacaciones', 'Lesionado', 'Siniestrado'])],
         ]);
 
         $user->update(['estado_operativo' => $validated['estado_operativo']]);
 
-        $mensaje = $validated['estado_operativo'] === 'Activo' 
-            ? 'Colaborador reactivado correctamente.' 
-            : 'Acceso del colaborador suspendido.';
-
-        return redirect()->back()->with('success', $mensaje);
+        return redirect()->back()->with('success', "Estado actualizado a {$validated['estado_operativo']}.");
     }
 
-    /**
-     * Fuerza el restablecimiento de credenciales desde el panel de RRHH.
-     */
-    public function forcePasswordReset(User $user): RedirectResponse
+    public function forcePasswordReset($id): RedirectResponse
     {
+        $user = User::findOrFail($id);
+
         $user->update([
-            'password' => Hash::make($user->dni),
-            'must_change_password' => true
+            'password'             => Hash::make($user->dni),
+            'must_change_password' => true,
         ]);
 
-        return redirect()->back()->with('success', 'Contraseña restablecida al DNI. Se requerirá un cambio obligatorio en el próximo ingreso.');
+        return redirect()->back()->with('success', 'Contraseña restablecida al DNI.');
     }
 }
