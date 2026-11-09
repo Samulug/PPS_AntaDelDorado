@@ -3,6 +3,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\CuadrillaController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\CursoController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -39,6 +40,10 @@ Route::middleware(['auth', 'verified', 'dashboard.access'])->group(function () {
     Route::resource('cuadrillas',CuadrillaController::class);
     Route::post('/cuadrillas/borrador', [CuadrillaController::class, 'saveDraft'])->name('cuadrillas.draft');
 
+    // Rutas de Cursos
+    Route::resource('cursos',CursoController::class);
+    Route::patch('/cursos/{id}/status', [CursoController::class, 'updateStatus'])->name('cursos.status');
+    
     });
 
 require __DIR__.'/auth.php';
