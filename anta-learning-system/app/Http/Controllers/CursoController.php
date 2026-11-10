@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
-
+use App\Services\MultimediaService;
 use App\Models\AuditAdmin;
 use App\Models\Cuestionario;
 use App\Models\Curso;
@@ -38,7 +38,7 @@ class CursoController extends Controller
     /**
      * Vista de creación procedimental (3 secciones) con soporte de borrador.
      */
-    public function create(): Response
+    public function create(MultimediaService $multimedia): Response
     {
         $cursosDisponibles = Curso::where('estado_curso', 'Activo')
             ->orderBy('nombre')
@@ -46,6 +46,7 @@ class CursoController extends Controller
 
         return Inertia::render('cursos/create', [
             'cursosDisponibles' => $cursosDisponibles,
+            'repositorioSharepoint' => $multimedia->listarRepositorio(),
         ]);
     }
 
@@ -173,7 +174,7 @@ class CursoController extends Controller
     /**
      * Vista de edición con salto libre entre secciones (Update).
      */
-    public function edit($id): Response
+    public function edit($id, MultimediaService $multimedia): Response
     {
         $curso = Curso::with([
             'modulos.lecciones.cuestionario.preguntas.opciones',
@@ -186,6 +187,7 @@ class CursoController extends Controller
         return Inertia::render('cursos/update', [
             'cursoEditable'     => $curso,
             'cursosDisponibles' => $cursosDisponibles,
+            'repositorioSharepoint' => $multimedia->listarRepositorio(),
         ]);
     }
 
@@ -362,5 +364,28 @@ class CursoController extends Controller
                 }
             }
         }
+    }
+
+    public function uploadMultimedia(Request $request, MultimediaService $multimedia)
+    {
+        $request->validate([
+            'archivo' => [
+                'required',
+                'file',
+                'mimes:mp4,pdf,ppt,pptx',
+                'max:102400', // Máx 100 MB
+            ],
+        ], [
+            'archivo.mimes' => 'Formato no soportado. Subí un video .mp4 o una presentación en .pdf / .pptx.',
+            'archivo.max'   => 'El archivo supera el límite de 100 MB.',
+        ]);
+
+        $datosArchivo = $multimedia->subirArchivo($request->file('archivo'));
+
+        return response()->json([
+            'ok'      => true,
+            'mensaje' => 'Archivo subido y verificado correctamente.',
+            'archivo' => $datosArchivo,
+        ]);
     }
 }

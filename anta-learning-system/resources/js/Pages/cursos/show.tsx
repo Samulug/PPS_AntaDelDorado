@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import AppLayout from '@/Layouts/app-layout';
+import ModalPrevisualizadorMultimedia from '@/Components/ModalPrevisualizadorMultimedia';
 import {
     ArrowLeft,
     Edit3,
@@ -11,11 +12,13 @@ import {
     Shuffle,
     Calendar,
     Layers,
+    Play,
 } from 'lucide-react';
 
 export default function CursoShow({ curso }: any) {
     const { flash } = usePage<any>().props;
     const [toastMsg, setToastMsg] = useState<string | null>(null);
+    const [previewLeccion, setPreviewLeccion] = useState<any | null>(null);
 
     useEffect(() => {
         if (flash?.success) {
@@ -214,21 +217,42 @@ export default function CursoShow({ curso }: any) {
                                             {contenidosMultimedia.map((lec: any) => (
                                                 <div
                                                     key={lec.id_leccion}
-                                                    className="flex items-center justify-between gap-3 bg-white dark:bg-[#1B1F1C] px-3.5 py-2 rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] text-[13.5px]"
+                                                    className="flex items-center justify-between gap-3 bg-white dark:bg-[#1B1F1C] px-3.5 py-2.5 rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] text-[13.5px]"
                                                 >
-                                                    <div className="flex items-center gap-2.5">
+                                                    <div className="flex items-center gap-2.5 min-w-0">
                                                         {lec.tipo_recurso === 'Video' ? (
-                                                            <Video className="h-4 w-4 text-[#2F6F5E]" />
+                                                            <Video className="h-4 w-4 text-[#2F6F5E] shrink-0" />
                                                         ) : (
-                                                            <Presentation className="h-4 w-4 text-[#B5651D]" />
+                                                            <Presentation className="h-4 w-4 text-[#B5651D] shrink-0" />
                                                         )}
-                                                        <span className="font-medium text-[#1F2328] dark:text-[#ECEFEC]">
+                                                        <span className="font-medium text-[#1F2328] dark:text-[#ECEFEC] truncate">
                                                             {lec.titulo}
                                                         </span>
+                                                        <span
+                                                            className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                                                                lec.archivo_verificado
+                                                                    ? 'bg-[#2F7D4F]/12 text-[#2F7D4F]'
+                                                                    : 'bg-[#B5651D]/15 text-[#B5651D]'
+                                                            }`}
+                                                        >
+                                                            {lec.archivo_verificado
+                                                                ? 'Archivo verificado'
+                                                                : 'Pendiente de subida'}
+                                                        </span>
                                                     </div>
-                                                    <span className="text-[12px] text-[#6B7280] font-mono">
-                                                        {lec.id_sharepoint_item}
-                                                    </span>
+
+                                                    <div className="flex items-center gap-2 shrink-0">
+                                                        <span className="text-[12px] text-[#6B7280] font-mono hidden sm:inline">
+                                                            {lec.id_sharepoint_item}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setPreviewLeccion(lec)}
+                                                            className="inline-flex items-center gap-1 px-3 py-1 rounded-[6px] bg-[#EDF4F1] text-[#2F6F5E] text-[12.5px] font-semibold hover:brightness-95 cursor-pointer"
+                                                        >
+                                                            Reproducir
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
@@ -315,6 +339,14 @@ export default function CursoShow({ curso }: any) {
                     {toastMsg}
                 </div>
             )}
+        <ModalPrevisualizadorMultimedia
+            isOpen={Boolean(previewLeccion)}
+            onClose={() => setPreviewLeccion(null)}
+            tituloLeccion={previewLeccion?.titulo || ''}
+            tipoRecurso={previewLeccion?.tipo_recurso || 'Video'}
+            archivoNombre={previewLeccion?.id_sharepoint_item || ''}
+            urlStreaming={previewLeccion?.url_recurso || null}
+        />
         </AppLayout>
     );
 }

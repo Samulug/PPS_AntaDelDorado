@@ -134,6 +134,10 @@ export default function CursosIndex({ cursos = [] }: Props) {
         });
 
         filtered.sort((a, b) => {
+            // Priorizar siempre los cursos en estado "Borrador" al principio de la tabla
+            if (a.estado_curso === 'Borrador' && b.estado_curso !== 'Borrador') return -1;
+            if (a.estado_curso !== 'Borrador' && b.estado_curso === 'Borrador') return 1;
+
             const cmp = a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' });
             return appliedFilters.sort === 'az' ? cmp : -cmp;
         });
@@ -274,7 +278,7 @@ export default function CursosIndex({ cursos = [] }: Props) {
                                 onChange={(e) =>
                                     setDraftFilters({ ...draftFilters, sort: e.target.value as 'az' | 'za' })
                                 }
-                                className="py-[7px] min-h-[38px] rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[13px] px-2"
+                                className="py-[7px] min-h-[38px] rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[13px] px-2.1"
                             >
                                 <option value="az">A-Z</option>
                                 <option value="za">Z-A</option>
@@ -343,7 +347,7 @@ export default function CursosIndex({ cursos = [] }: Props) {
                     <table className="w-full table-fixed border-collapse text-left">
                         <thead>
                             <tr className="border-b border-[#E9E9E7] dark:border-[#2A302B] bg-[#F7F7F6]/60 dark:bg-[#141714]/50">
-                                <th className="w-[34%] py-3 px-5 font-medium text-[#6B7280] dark:text-[#9AA39D] text-[13px]">
+<th className="w-[32%] py-3 px-5 font-medium text-[#6B7280] dark:text-[#9AA39D] text-[13px]">
                                     Nombre del Curso y Correlatividad
                                 </th>
                                 <th className="w-[15%] py-3 px-4 font-medium text-[#6B7280] dark:text-[#9AA39D] text-[13px]">
@@ -355,7 +359,7 @@ export default function CursosIndex({ cursos = [] }: Props) {
                                 <th className="w-[14%] py-3 px-4 font-medium text-[#6B7280] dark:text-[#9AA39D] text-[13px]">
                                     Estado
                                 </th>
-                                <th className="w-[22%] py-3 px-5 font-medium text-[#6B7280] dark:text-[#9AA39D] text-[13px] text-right">
+                                <th className="w-[24%] py-3 px-4 font-medium text-[#6B7280] dark:text-[#9AA39D] text-[13px] text-center">
                                     Acciones
                                 </th>
                             </tr>
@@ -411,26 +415,26 @@ export default function CursosIndex({ cursos = [] }: Props) {
                                         </td>
 
                                         {/* Columna 5: Acciones */}
-                                        <td className="py-3.5 px-5 align-middle text-right">
-                                            <div className="inline-flex items-center justify-end gap-1.5 flex-wrap">
+                                        <td className="py-3.5 px-4 align-middle text-center">
+                                            <div className="inline-flex items-center justify-center gap-1.5 flex-nowrap">
                                                 <Link
                                                     href={`/cursos/${curso.id_curso}`}
                                                     className="inline-flex items-center gap-1 px-2.5 py-1 min-h-[30px] rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[13px] font-medium text-[#1F2328] dark:text-[#ECEFEC]"
                                                     title="Ver detalle del curso"
                                                 >
-                                                    <Eye className="h-3.5 w-3.5" />
+                                                    <Eye className="h-3.5 w-3.5 shrink-0" />
                                                     Ver
                                                 </Link>
 
                                                 <Link
                                                     href={`/cursos/${curso.id_curso}/edit`}
-                                                    className={`inline-flex items-center gap-1 px-2.5 py-1 min-h-[30px] rounded-[8px] border text-[13px] font-medium ${
+                                                    className={`inline-flex items-center gap-1 px-2.5 py-1 min-h-[30px] rounded-[8px] border text-[13px] font-medium whitespace-nowrap ${
                                                         curso.estado_curso === 'Borrador'
                                                             ? 'border-[#B5651D] bg-[#B5651D]/10 text-[#B5651D] dark:text-[#E3A15A]'
                                                             : 'border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[#1F2328] dark:text-[#ECEFEC]'
                                                     }`}
                                                 >
-                                                    <Edit3 className="h-3.5 w-3.5" />
+                                                    <Edit3 className="h-3.5 w-3.5 shrink-0" />
                                                     {curso.estado_curso === 'Borrador'
                                                         ? 'Continuar'
                                                         : 'Editar'}
@@ -441,7 +445,7 @@ export default function CursosIndex({ cursos = [] }: Props) {
                                                     onClick={() => openDeleteModal(curso)}
                                                     className="inline-flex items-center gap-1 px-2.5 py-1 min-h-[30px] rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[13px] font-medium text-[#B3372B] dark:text-[#EE8274] hover:bg-[#B3372B]/10 cursor-pointer"
                                                 >
-                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                    <Trash2 className="h-3.5 w-3.5 shrink-0" />
                                                 </button>
                                             </div>
                                         </td>
@@ -472,7 +476,7 @@ export default function CursosIndex({ cursos = [] }: Props) {
                                     setPerPage(Number(e.target.value));
                                     setPage(1);
                                 }}
-                                className="px-2 py-1 rounded-[6px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[#1F2328] dark:text-[#ECEFEC]"
+                                className="px-2.1 py-1 rounded-[6px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[#1F2328] dark:text-[#ECEFEC]"
                             >
                                 {[5, 10, 15, 20, 50].map((n) => (
                                     <option key={n} value={n}>
@@ -493,7 +497,7 @@ export default function CursosIndex({ cursos = [] }: Props) {
                             <select
                                 value={page}
                                 onChange={(e) => setPage(Number(e.target.value))}
-                                className="px-2 py-1 rounded-[6px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[#1F2328] dark:text-[#ECEFEC]"
+                                className="px-2.1 py-1 rounded-[6px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[#1F2328] dark:text-[#ECEFEC]"
                             >
                                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
                                     <option key={p} value={p}>

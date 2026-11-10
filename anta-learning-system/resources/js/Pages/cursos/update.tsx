@@ -1,17 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { Head, router } from '@inertiajs/react';
+import axios from 'axios';
 import AppLayout from '@/Layouts/app-layout';
+import ModalPrevisualizadorMultimedia from '@/Components/ModalPrevisualizadorMultimedia';
 import {
-    Save,
-    X,
-    CheckCircle2,
-    ArrowRight,
-    ArrowLeft,
-    Plus,
-    Trash2,
-    Video,
-    Presentation,
-    Upload,
+    Save, X, CheckCircle2, ArrowRight, ArrowLeft, Plus, 
+    Trash2, Video, Presentation, Upload, Play, FolderOpen
 } from 'lucide-react';
 
 export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: any) {
@@ -19,6 +13,12 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     const [reqSearch, setReqSearch] = useState('');
+
+    const [uploadingKey, setUploadingKey] = useState<string | null>(null);
+    const [uploadProgress, setUploadProgress] = useState<number>(0);
+    const [previewItem, setPreviewItem] = useState<any | null>(null);
+
+
 
     // Extraer módulos y cuestionario existentes del cursoEditable
     const { initialModulos, initialCuestionario } = useMemo(() => {
@@ -33,13 +33,12 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
                 } else {
                     contenidos.push({
                         titulo: l.titulo,
-                        tipo_recurso:
-                            l.tipo_recurso === 'Video' ? 'Video' : 'Presentacion_Filminas',
+                        tipo_recurso: l.tipo_recurso === 'Video' ? 'Video' : 'Presentacion_Filminas',
                         archivo_nombre: l.id_sharepoint_item || 'Archivo_Adjunto.pptx',
+                        url_streaming: l.url_recurso || null, // <- IMPORTANTE
                     });
                 }
             });
-
             mods.push({
                 titulo: m.titulo || `Módulo ${idx + 1}`,
                 dia_liberacion: m.dia_liberacion || idx + 1,
@@ -47,13 +46,7 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
             });
         });
 
-        if (mods.length === 0) {
-            mods.push({
-                titulo: 'Módulo 1',
-                dia_liberacion: 1,
-                contenidos: [],
-            });
-        }
+        if (mods.length === 0) mods.push({ titulo: 'Módulo 1', dia_liberacion: 1, contenidos: [] });
 
         const quiz = quizEncontrado
             ? {
@@ -128,6 +121,48 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
     };
 
     const handleClose = () => router.visit(`/cursos/${cursoEditable.id_curso}`);
+
+    const handleFileUpload = async (mIdx: number, cIdx: number, file: File) => {
+        const key = `${mIdx}-${cIdx}`;
+        setUploadingKey(key);
+        setUploadProgress(0);
+
+        const formData = new FormData();
+        formData.append('archivo', file);
+
+        try {
+            const res = await axios.post('/cursos/multimedia/upload', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                onUploadProgress: (progressEvent) => {
+                    if (progressEvent.total) {
+                        setUploadProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total));
+                    }
+                },
+            });
+
+            if (res.data?.ok && res.data?.archivo) {
+                const subido = res.data.archivo;
+                setWizardData((prev) => {
+                    const copia = [...prev.modulos];
+                    const contenidos = [...copia[mIdx].contenidos];
+                    contenidos[cIdx] = {
+                        ...contenidos[cIdx],
+                        archivo_nombre: subido.id_sharepoint_item,
+                        url_streaming: subido.url_streaming,
+                        peso_mb: subido.peso_mb,
+                    };
+                    copia[mIdx] = { ...copia[mIdx], contenidos };
+                    return { ...prev, modulos: copia };
+                });
+                triggerToast(`Archivo subido correctamente.`);
+            }
+        } catch (err: any) {
+            triggerToast(err.response?.data?.message || 'Error al subir el archivo (Máx. 150MB).');
+        } finally {
+            setUploadingKey(null);
+            setUploadProgress(0);
+        }
+    };
 
     // Funciones de edición de Módulos y Cuestionario
     const addModulo = () => {
@@ -408,54 +443,47 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
                 </header>
 
                 {/* CUERPO INTERACTIVO */}
+                {/* CUERPO INTERACTIVO */}
                 <div className="flex-1 p-8 md:p-10 overflow-y-auto">
+                    {/* SECCIÓN 1 */}
                     {step === 1 && (
                         <div className="grid gap-6 animate-in fade-in duration-200">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <label className="grid gap-2 text-[14px] font-medium">
+                                <label className="grid gap-2 text-[14px] font-medium text-[#1F2328] dark:text-[#ECEFEC]">
                                     Nombre del curso
                                     <input
                                         type="text"
                                         required
                                         value={wizardData.nombre}
-                                        onChange={(e) =>
-                                            setWizardData({ ...wizardData, nombre: e.target.value })
-                                        }
-                                        className="px-4 py-2.5 border border-[#E9E9E7] rounded-[10px] text-[15px]"
+                                        onChange={(e) => setWizardData({ ...wizardData, nombre: e.target.value })}
+                                        className="px-4 py-2.5 rounded-[10px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[#1F2328] dark:text-[#ECEFEC] text-[15px] outline-none focus:border-[#2F6F5E]"
                                     />
                                 </label>
 
-                                <label className="grid gap-2 text-[14px] font-medium">
+                                <label className="grid gap-2 text-[14px] font-medium text-[#1F2328] dark:text-[#ECEFEC]">
                                     Fecha de vencimiento
                                     <input
                                         type="date"
                                         required
                                         value={wizardData.tiempo_vigencia}
-                                        onChange={(e) =>
-                                            setWizardData({
-                                                ...wizardData,
-                                                tiempo_vigencia: e.target.value,
-                                            })
-                                        }
-                                        className="px-4 py-2.5 border border-[#E9E9E7] rounded-[10px] text-[15px]"
+                                        onChange={(e) => setWizardData({ ...wizardData, tiempo_vigencia: e.target.value })}
+                                        className="px-4 py-2.5 rounded-[10px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[#1F2328] dark:text-[#ECEFEC] text-[15px] outline-none focus:border-[#2F6F5E]"
                                     />
                                 </label>
                             </div>
 
-                            <label className="grid gap-2 text-[14px] font-medium">
+                            <label className="grid gap-2 text-[14px] font-medium text-[#1F2328] dark:text-[#ECEFEC]">
                                 Descripción
                                 <textarea
                                     rows={2}
                                     value={wizardData.descripcion}
-                                    onChange={(e) =>
-                                        setWizardData({ ...wizardData, descripcion: e.target.value })
-                                    }
-                                    className="px-4 py-2.5 border border-[#E9E9E7] rounded-[10px] text-[14px]"
+                                    onChange={(e) => setWizardData({ ...wizardData, descripcion: e.target.value })}
+                                    className="px-4 py-2.5 rounded-[10px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[#1F2328] dark:text-[#ECEFEC] text-[14px] outline-none focus:border-[#2F6F5E]"
                                 />
                             </label>
 
                             <div className="flex flex-col gap-3">
-                                <h4 className="text-[15px] font-semibold m-0">
+                                <h4 className="text-[15px] font-semibold text-[#1F2328] dark:text-[#ECEFEC] m-0">
                                     Curso requerido para desbloquear este curso
                                 </h4>
                                 <input
@@ -463,23 +491,21 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
                                     value={reqSearch}
                                     onChange={(e) => setReqSearch(e.target.value)}
                                     placeholder="Buscar curso requisito..."
-                                    className="h-[38px] px-3.5 py-1.5 border border-[#E9E9E7] rounded-[8px] text-[14px]"
+                                    className="h-[38px] px-3.5 py-1.5 rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-[#F7F7F6] dark:bg-[#141714] text-[#1F2328] dark:text-[#ECEFEC] text-[14px] outline-none focus:border-[#2F6F5E]"
                                 />
 
-                                <div className="max-h-[190px] overflow-y-auto border border-[#E9E9E7] rounded-[10px] p-3 grid gap-2">
+                                <div className="max-h-[190px] overflow-y-auto border border-[#E9E9E7] dark:border-[#2A302B] rounded-[10px] p-3 grid gap-2">
                                     <label
                                         className={`flex items-center gap-3 p-2.5 rounded-[8px] border cursor-pointer text-[14px] ${
                                             wizardData.id_curso_req === null
-                                                ? 'border-[#2F6F5E] bg-[#EDF4F1] font-semibold text-[#2F6F5E]'
-                                                : 'border-[#E9E9E7]'
+                                                ? 'border-[#2F6F5E] bg-[#EDF4F1] dark:bg-[#223029] font-semibold text-[#2F6F5E] dark:text-[#6FBFA5]'
+                                                : 'border-[#E9E9E7] dark:border-[#2A302B] text-[#1F2328] dark:text-[#ECEFEC]'
                                         }`}
                                     >
                                         <input
                                             type="radio"
                                             checked={wizardData.id_curso_req === null}
-                                            onChange={() =>
-                                                setWizardData({ ...wizardData, id_curso_req: null })
-                                            }
+                                            onChange={() => setWizardData({ ...wizardData, id_curso_req: null })}
                                             className="accent-[#2F6F5E]"
                                         />
                                         <span>Sin curso previo requerido</span>
@@ -490,19 +516,14 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
                                             key={req.id_curso}
                                             className={`flex items-center gap-3 p-2.5 rounded-[8px] border cursor-pointer text-[14px] ${
                                                 wizardData.id_curso_req === req.id_curso
-                                                    ? 'border-[#2F6F5E] bg-[#EDF4F1] font-semibold text-[#2F6F5E]'
-                                                    : 'border-[#E9E9E7]'
+                                                    ? 'border-[#2F6F5E] bg-[#EDF4F1] dark:bg-[#223029] font-semibold text-[#2F6F5E] dark:text-[#6FBFA5]'
+                                                    : 'border-[#E9E9E7] dark:border-[#2A302B] text-[#1F2328] dark:text-[#ECEFEC]'
                                             }`}
                                         >
                                             <input
                                                 type="radio"
                                                 checked={wizardData.id_curso_req === req.id_curso}
-                                                onChange={() =>
-                                                    setWizardData({
-                                                        ...wizardData,
-                                                        id_curso_req: req.id_curso,
-                                                    })
-                                                }
+                                                onChange={() => setWizardData({ ...wizardData, id_curso_req: req.id_curso })}
                                                 className="accent-[#2F6F5E]"
                                             />
                                             <span>{req.nombre}</span>
@@ -513,11 +534,12 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
                         </div>
                     )}
 
+                    {/* SECCIÓN 2: MÓDULOS Y ARCHIVOS */}
                     {step === 2 && (
                         <div className="grid gap-6 animate-in fade-in duration-200">
                             <div className="flex items-center justify-between">
-                                <h3 className="text-[20px] font-bold m-0">
-                                    Módulos y Contenido (PowerPoint / Video)
+                                <h3 className="text-[20px] font-bold text-[#1F2328] dark:text-[#ECEFEC] m-0">
+                                    Módulos y Contenido
                                 </h3>
                                 <button
                                     type="button"
@@ -533,7 +555,7 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
                                 {wizardData.modulos.map((mod: any, mIdx: number) => (
                                     <div
                                         key={mIdx}
-                                        className="border border-[#E9E9E7] rounded-[12px] p-5 bg-[#F7F7F6]/50 grid gap-4"
+                                        className="border border-[#E9E9E7] dark:border-[#2A302B] rounded-[12px] p-5 bg-[#F7F7F6]/50 dark:bg-[#141714]/50 grid gap-4"
                                     >
                                         <div className="flex items-center justify-between gap-3">
                                             <div className="flex items-center gap-2.5 flex-1">
@@ -543,95 +565,97 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
                                                 <input
                                                     type="text"
                                                     value={mod.titulo}
-                                                    onChange={(e) =>
-                                                        updateModuloTitulo(mIdx, e.target.value)
-                                                    }
-                                                    className="w-full px-3 py-1.5 rounded-[8px] border border-[#E9E9E7] bg-white font-semibold text-[15px]"
+                                                    onChange={(e) => updateModuloTitulo(mIdx, e.target.value)}
+                                                    className="w-full px-3 py-1.5 rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[#1F2328] dark:text-[#ECEFEC] font-semibold text-[15px] outline-none focus:border-[#2F6F5E]"
                                                 />
                                             </div>
                                             <button
                                                 type="button"
                                                 onClick={() => removeModulo(mIdx)}
-                                                className="p-2 text-[#B3372B] cursor-pointer"
+                                                className="p-2 text-[#B3372B] dark:text-[#EE8274] hover:bg-[#B3372B]/10 rounded-[8px] cursor-pointer"
                                             >
                                                 <Trash2 className="h-4 w-4" />
                                             </button>
                                         </div>
 
                                         <div className="grid gap-2.5">
-                                            {mod.contenidos.map((cont: any, cIdx: number) => (
-                                                <div
-                                                    key={cIdx}
-                                                    className="grid grid-cols-1 sm:grid-cols-[140px_1fr_auto_auto] items-center gap-2.5 bg-white p-3 rounded-[8px] border border-[#E9E9E7]"
-                                                >
-                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium bg-[#EDF4F1] text-[#2F6F5E]">
-                                                        {cont.tipo_recurso === 'Video' ? (
-                                                            <>
-                                                                <Video className="h-3.5 w-3.5" />
-                                                                Video
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <Presentation className="h-3.5 w-3.5" />
-                                                                PowerPoint
-                                                            </>
-                                                        )}
-                                                    </span>
+                                            {mod.contenidos.map((cont: any, cIdx: number) => {
+                                                const isUploadingThis = uploadingKey === `${mIdx}-${cIdx}`;
+                                                const resolvedUrl = cont.url_streaming || null;
 
-                                                    <input
-                                                        type="text"
-                                                        value={cont.titulo}
-                                                        onChange={(e) =>
-                                                            updateContenido(
-                                                                mIdx,
-                                                                cIdx,
-                                                                'titulo',
-                                                                e.target.value
-                                                            )
-                                                        }
-                                                        className="px-3 py-1.5 rounded-[6px] border border-[#E9E9E7] text-[14px]"
-                                                    />
-
-                                                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] border border-[#E9E9E7] bg-[#F7F7F6] text-[12px] cursor-pointer truncate max-w-[200px]">
-                                                        <Upload className="h-3.5 w-3.5 text-[#2F6F5E] shrink-0" />
-                                                        <span className="truncate">
-                                                            {cont.archivo_nombre}
-                                                        </span>
-                                                        <input
-                                                            type="file"
-                                                            onChange={(e) => {
-                                                                const file = e.target.files?.[0];
-                                                                if (file) {
-                                                                    updateContenido(
-                                                                        mIdx,
-                                                                        cIdx,
-                                                                        'archivo_nombre',
-                                                                        file.name
-                                                                    );
-                                                                }
-                                                            }}
-                                                            className="hidden"
-                                                        />
-                                                    </label>
-
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeContenido(mIdx, cIdx)}
-                                                        className="p-1.5 text-[#6B7280] hover:text-[#B3372B] cursor-pointer"
+                                                return (
+                                                    <div
+                                                        key={cIdx}
+                                                        className="grid grid-cols-1 sm:grid-cols-[135px_1fr_auto_auto_auto] items-center gap-2.5 bg-white dark:bg-[#1B1F1C] p-3 rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B]"
                                                     >
-                                                        <X className="h-4 w-4" />
-                                                    </button>
-                                                </div>
-                                            ))}
+                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium bg-[#EDF4F1] dark:bg-[#223029] text-[#2F6F5E] dark:text-[#6FBFA5]">
+                                                            {cont.tipo_recurso === 'Video' ? (
+                                                                <><Video className="h-3.5 w-3.5" /> Video</>
+                                                            ) : (
+                                                                <><Presentation className="h-3.5 w-3.5" /> PowerPoint</>
+                                                            )}
+                                                        </span>
+
+                                                        <input
+                                                            type="text"
+                                                            value={cont.titulo}
+                                                            onChange={(e) => updateContenido(mIdx, cIdx, 'titulo', e.target.value)}
+                                                            className="px-3 py-1.5 rounded-[6px] border border-[#E9E9E7] dark:border-[#2A302B] bg-transparent text-[#1F2328] dark:text-[#ECEFEC] text-[14px] outline-none focus:border-[#2F6F5E]"
+                                                        />
+
+                                                        <label
+                                                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] border text-[12px] cursor-pointer truncate max-w-[200px] ${
+                                                                resolvedUrl
+                                                                    ? 'border-[#2F7D4F]/40 bg-[#2F7D4F]/10 text-[#2F7D4F] dark:text-[#6CC28A] font-semibold'
+                                                                    : 'border-[#E9E9E7] dark:border-[#2A302B] bg-[#F7F7F6] dark:bg-[#141714] text-[#1F2328] dark:text-[#ECEFEC]'
+                                                            }`}
+                                                        >
+                                                            <Upload className="h-3.5 w-3.5 shrink-0" />
+                                                            <span className="truncate">
+                                                                {isUploadingThis ? `Subiendo ${uploadProgress}%` : cont.archivo_nombre}
+                                                            </span>
+                                                            <input
+                                                                type="file"
+                                                                disabled={isUploadingThis}
+                                                                accept={cont.tipo_recurso === 'Video' ? 'video/mp4,.mp4' : '.pdf,.ppt,.pptx'}
+                                                                onChange={(e) => {
+                                                                    const file = e.target.files?.[0];
+                                                                    if (file) handleFileUpload(mIdx, cIdx, file);
+                                                                }}
+                                                                className="hidden"
+                                                            />
+                                                        </label>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setPreviewItem({ ...cont, url_streaming: resolvedUrl })}
+                                                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-[6px] border text-[12px] font-medium cursor-pointer ${
+                                                                resolvedUrl
+                                                                    ? 'border-[#2F6F5E] bg-[#EDF4F1] dark:bg-[#223029] text-[#2F6F5E] dark:text-[#6FBFA5]'
+                                                                    : 'border-[#E9E9E7] dark:border-[#2A302B] text-[#6B7280] dark:text-[#9AA39D] bg-white dark:bg-[#1B1F1C]'
+                                                            }`}
+                                                        >
+                                                            <Play className="h-3.5 w-3.5 shrink-0" />
+                                                            Probar
+                                                        </button>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeContenido(mIdx, cIdx)}
+                                                            className="p-1.5 text-[#6B7280] hover:text-[#B3372B] dark:hover:text-[#EE8274] cursor-pointer"
+                                                        >
+                                                            <X className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
 
                                         <div className="flex gap-2">
                                             <button
                                                 type="button"
-                                                onClick={() =>
-                                                    addContenido(mIdx, 'Presentacion_Filminas')
-                                                }
-                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] border border-[#E9E9E7] bg-white text-[13px] font-medium cursor-pointer"
+                                                onClick={() => addContenido(mIdx, 'Presentacion_Filminas')}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[#1F2328] dark:text-[#ECEFEC] text-[13px] font-medium cursor-pointer"
                                             >
                                                 <Presentation className="h-4 w-4 text-[#B5651D]" />
                                                 + PowerPoint
@@ -639,7 +663,7 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
                                             <button
                                                 type="button"
                                                 onClick={() => addContenido(mIdx, 'Video')}
-                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] border border-[#E9E9E7] bg-white text-[13px] font-medium cursor-pointer"
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[#1F2328] dark:text-[#ECEFEC] text-[13px] font-medium cursor-pointer"
                                             >
                                                 <Video className="h-4 w-4 text-[#2F6F5E]" />
                                                 + Video
@@ -651,50 +675,40 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
                         </div>
                     )}
 
+                    {/* SECCIÓN 3: CUESTIONARIO */}
                     {step === 3 && (
                         <div className="grid gap-6 animate-in fade-in duration-200">
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-[#F7F7F6] p-4 rounded-[12px] border border-[#E9E9E7]">
-                                <label className="grid gap-1.5 text-[13px] font-medium text-[#6B7280]">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-[#F7F7F6] dark:bg-[#141714] p-4 rounded-[12px] border border-[#E9E9E7] dark:border-[#2A302B]">
+                                <label className="grid gap-1.5 text-[13px] font-medium text-[#6B7280] dark:text-[#9AA39D]">
                                     Puntaje mínimo (%)
                                     <input
                                         type="number"
                                         min={10}
                                         max={100}
                                         value={wizardData.cuestionario.puntaje_min_aprobacion}
-                                        onChange={(e) =>
-                                            setWizardData({
-                                                ...wizardData,
-                                                cuestionario: {
-                                                    ...wizardData.cuestionario,
-                                                    puntaje_min_aprobacion: Number(e.target.value),
-                                                },
-                                            })
-                                        }
-                                        className="px-3 py-1.5 rounded-[8px] border bg-white text-[15px] font-bold"
+                                        onChange={(e) => setWizardData({
+                                            ...wizardData,
+                                            cuestionario: { ...wizardData.cuestionario, puntaje_min_aprobacion: Number(e.target.value) },
+                                        })}
+                                        className="px-3 py-1.5 rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[#1F2328] dark:text-[#ECEFEC] text-[15px] font-bold outline-none focus:border-[#2F6F5E]"
                                     />
                                 </label>
 
-                                <label className="grid gap-1.5 text-[13px] font-medium text-[#6B7280]">
-                                    Preguntas a mostrar (de{' '}
-                                    {wizardData.cuestionario.preguntas.length})
+                                <label className="grid gap-1.5 text-[13px] font-medium text-[#6B7280] dark:text-[#9AA39D]">
+                                    Preguntas a mostrar (de {wizardData.cuestionario.preguntas.length})
                                     <input
                                         type="number"
                                         min={1}
                                         max={wizardData.cuestionario.preguntas.length}
                                         value={wizardData.cuestionario.cantidad_preguntas_mostrar}
-                                        onChange={(e) =>
-                                            setWizardData({
-                                                ...wizardData,
-                                                cuestionario: {
-                                                    ...wizardData.cuestionario,
-                                                    cantidad_preguntas_mostrar: Math.min(
-                                                        wizardData.cuestionario.preguntas.length,
-                                                        Math.max(1, Number(e.target.value))
-                                                    ),
-                                                },
-                                            })
-                                        }
-                                        className="px-3 py-1.5 rounded-[8px] border bg-white text-[15px] font-bold"
+                                        onChange={(e) => setWizardData({
+                                            ...wizardData,
+                                            cuestionario: {
+                                                ...wizardData.cuestionario,
+                                                cantidad_preguntas_mostrar: Math.min(wizardData.cuestionario.preguntas.length, Math.max(1, Number(e.target.value))),
+                                            },
+                                        })}
+                                        className="px-3 py-1.5 rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[#1F2328] dark:text-[#ECEFEC] text-[15px] font-bold outline-none focus:border-[#2F6F5E]"
                                     />
                                 </label>
 
@@ -702,126 +716,101 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
                                     <input
                                         type="checkbox"
                                         checked={wizardData.cuestionario.orden_aleatorio}
-                                        onChange={(e) =>
-                                            setWizardData({
-                                                ...wizardData,
-                                                cuestionario: {
-                                                    ...wizardData.cuestionario,
-                                                    orden_aleatorio: e.target.checked,
-                                                },
-                                            })
-                                        }
+                                        onChange={(e) => setWizardData({
+                                            ...wizardData,
+                                            cuestionario: { ...wizardData.cuestionario, orden_aleatorio: e.target.checked },
+                                        })}
                                         className="accent-[#2F6F5E] w-4.5 h-4.5"
                                     />
-                                    <span className="text-[14px] font-semibold">
-                                        Mezclar preguntas (Shuffle)
+                                    <span className="text-[14px] font-semibold text-[#1F2328] dark:text-[#ECEFEC]">
+                                        Mezclar (Shuffle)
                                     </span>
                                 </label>
                             </div>
 
                             <div className="grid gap-4">
-                                {wizardData.cuestionario.preguntas.map(
-                                    (preg: any, pIdx: number) => (
-                                        <div
-                                            key={pIdx}
-                                            className="border-l-4 border-l-[#2F6F5E] border border-[#E9E9E7] rounded-[10px] p-4 bg-white grid gap-3"
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-[13px] font-bold text-[#2F6F5E]">
-                                                    Pregunta #{pIdx + 1}
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removePregunta(pIdx)}
-                                                    className="text-[12px] text-[#B3372B] hover:underline cursor-pointer"
-                                                >
-                                                    Quitar pregunta
-                                                </button>
-                                            </div>
-
-                                            <input
-                                                type="text"
-                                                value={preg.enunciado}
-                                                onChange={(e) =>
-                                                    updatePreguntaEnunciado(pIdx, e.target.value)
-                                                }
-                                                className="px-3.5 py-2 rounded-[8px] border bg-[#F7F7F6] text-[14.5px] font-medium"
-                                            />
-
-                                            <div className="grid gap-2 pl-2">
-                                                {preg.opciones.map((op: any, oIdx: number) => (
-                                                    <div
-                                                        key={oIdx}
-                                                        className="flex items-center gap-2.5"
-                                                    >
-                                                        <input
-                                                            type="radio"
-                                                            name={`edit_correcta_${pIdx}`}
-                                                            checked={op.es_correcta}
-                                                            onChange={() =>
-                                                                markOpcionCorrecta(pIdx, oIdx)
-                                                            }
-                                                            className="accent-[#2F6F5E] w-4 h-4 cursor-pointer"
-                                                        />
-                                                        <input
-                                                            type="text"
-                                                            value={op.texto_opcion}
-                                                            onChange={(e) =>
-                                                                updateOpcionTexto(
-                                                                    pIdx,
-                                                                    oIdx,
-                                                                    e.target.value
-                                                                )
-                                                            }
-                                                            className={`flex-1 px-3 py-1.5 rounded-[8px] border text-[14px] ${
-                                                                op.es_correcta
-                                                                    ? 'border-[#2F6F5E] bg-[#EDF4F1]/60 font-medium'
-                                                                    : 'border-[#E9E9E7]'
-                                                            }`}
-                                                        />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeOpcion(pIdx, oIdx)}
-                                                            className="p-1 text-[#6B7280] hover:text-[#B3372B] cursor-pointer"
-                                                        >
-                                                            <X className="h-4 w-4" />
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-
+                                {wizardData.cuestionario.preguntas.map((preg: any, pIdx: number) => (
+                                    <div
+                                        key={pIdx}
+                                        className="border-l-4 border-l-[#2F6F5E] border border-[#E9E9E7] dark:border-[#2A302B] rounded-[10px] p-4 bg-white dark:bg-[#1B1F1C] grid gap-3"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[13px] font-bold text-[#2F6F5E] dark:text-[#6FBFA5]">
+                                                Pregunta #{pIdx + 1}
+                                            </span>
                                             <button
                                                 type="button"
-                                                onClick={() => addOpcion(pIdx)}
-                                                className="justify-self-start text-[13px] font-medium text-[#2F6F5E] hover:underline cursor-pointer"
+                                                onClick={() => removePregunta(pIdx)}
+                                                className="text-[12px] text-[#B3372B] dark:text-[#EE8274] hover:underline cursor-pointer"
                                             >
-                                                + Añadir opción
+                                                Quitar pregunta
                                             </button>
                                         </div>
-                                    )
-                                )}
+
+                                        <input
+                                            type="text"
+                                            value={preg.enunciado}
+                                            onChange={(e) => updatePreguntaEnunciado(pIdx, e.target.value)}
+                                            className="px-3.5 py-2 rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-[#F7F7F6] dark:bg-[#141714] text-[#1F2328] dark:text-[#ECEFEC] text-[14.5px] font-medium outline-none focus:border-[#2F6F5E]"
+                                        />
+
+                                        <div className="grid gap-2 pl-2">
+                                            {preg.opciones.map((op: any, oIdx: number) => (
+                                                <div key={oIdx} className="flex items-center gap-2.5">
+                                                    <input
+                                                        type="radio"
+                                                        name={`edit_correcta_${pIdx}`}
+                                                        checked={op.es_correcta}
+                                                        onChange={() => markOpcionCorrecta(pIdx, oIdx)}
+                                                        className="accent-[#2F6F5E] w-4 h-4 cursor-pointer"
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        value={op.texto_opcion}
+                                                        onChange={(e) => updateOpcionTexto(pIdx, oIdx, e.target.value)}
+                                                        className={`flex-1 px-3 py-1.5 rounded-[8px] border text-[#1F2328] dark:text-[#ECEFEC] text-[14px] outline-none focus:border-[#2F6F5E] ${
+                                                            op.es_correcta
+                                                                ? 'border-[#2F6F5E] bg-[#EDF4F1]/60 dark:bg-[#223029]/50 font-medium'
+                                                                : 'border-[#E9E9E7] dark:border-[#2A302B] bg-transparent'
+                                                        }`}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeOpcion(pIdx, oIdx)}
+                                                        className="p-1 text-[#6B7280] dark:text-[#9AA39D] hover:text-[#B3372B] dark:hover:text-[#EE8274] cursor-pointer"
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => addOpcion(pIdx)}
+                                            className="justify-self-start text-[13px] font-medium text-[#2F6F5E] dark:text-[#6FBFA5] hover:underline cursor-pointer"
+                                        >
+                                            + Añadir opción
+                                        </button>
+                                    </div>
+                                ))}
 
                                 <button
                                     type="button"
                                     onClick={addPregunta}
-                                    className="justify-self-start inline-flex items-center gap-1.5 px-4 py-2 rounded-[8px] border border-[#2F6F5E] text-[#2F6F5E] text-[13.5px] font-semibold cursor-pointer"
+                                    className="justify-self-start inline-flex items-center gap-1.5 px-4 py-2 rounded-[8px] border border-[#2F6F5E] text-[#2F6F5E] dark:text-[#6FBFA5] text-[13.5px] font-semibold cursor-pointer"
                                 >
                                     <Plus className="h-4 w-4" />
                                     Añadir otra pregunta
                                 </button>
                             </div>
 
-                            <label className="flex items-center gap-3 p-4 bg-[#F7F7F6] border rounded-[10px]">
-                                <span className="font-semibold text-[14px]">Estado al guardar:</span>
+                            <label className="flex items-center gap-3 p-4 bg-[#F7F7F6] dark:bg-[#141714] border border-[#E9E9E7] dark:border-[#2A302B] rounded-[10px]">
+                                <span className="font-semibold text-[14px] text-[#1F2328] dark:text-[#ECEFEC]">Estado al guardar:</span>
                                 <select
                                     value={wizardData.estado_curso}
-                                    onChange={(e) =>
-                                        setWizardData({
-                                            ...wizardData,
-                                            estado_curso: e.target.value as any,
-                                        })
-                                    }
-                                    className="flex-1 px-3 py-2 rounded-[8px] border bg-white font-bold"
+                                    onChange={(e) => setWizardData({ ...wizardData, estado_curso: e.target.value as any })}
+                                    className="flex-1 px-3 py-2 rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[#1F2328] dark:text-[#ECEFEC] font-bold outline-none focus:border-[#2F6F5E]"
                                 >
                                     <option value="Activo">Activo</option>
                                     <option value="Borrador">Borrador</option>
@@ -832,7 +821,7 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
                     )}
                 </div>
 
-                <footer className="px-8 py-5 border-t border-[#E9E9E7] bg-[#F7F7F6] flex justify-between gap-4">
+                <footer className="px-8 py-5 border-t border-[#E9E9E7] dark:border-[#2A302B] dark:bg-[#2A302B] bg-[#F7F7F6] flex justify-between gap-4">
                     <button
                         type="button"
                         onClick={handleClose}
@@ -846,7 +835,7 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
                             type="button"
                             disabled={step === 1}
                             onClick={() => setStep((s) => (s - 1) as 1 | 2 | 3)}
-                            className="px-5 py-2.5 rounded-[10px] border bg-white font-semibold flex gap-2 items-center disabled:opacity-50 cursor-pointer"
+                            className="px-5 py-2.5 rounded-[10px] border text-black bg-white font-semibold flex gap-2 items-center disabled:opacity-50 cursor-pointer"
                         >
                             <ArrowLeft className="w-4 h-4" />
                             Anterior
@@ -881,6 +870,14 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
                     {toastMsg}
                 </div>
             )}
+        <ModalPrevisualizadorMultimedia
+                isOpen={Boolean(previewItem)}
+                onClose={() => setPreviewItem(null)}
+                tituloLeccion={previewItem?.titulo || ''}
+                tipoRecurso={previewItem?.tipo_recurso || 'Video'}
+                archivoNombre={previewItem?.archivo_nombre || ''}
+                urlStreaming={previewItem?.url_streaming || null}
+            />
         </AppLayout>
     );
 }

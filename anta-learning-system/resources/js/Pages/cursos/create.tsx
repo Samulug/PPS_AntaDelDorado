@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Head, router } from '@inertiajs/react';
 import axios from 'axios';
 import AppLayout from '@/Layouts/app-layout';
+import ModalPrevisualizadorMultimedia from '@/Components/ModalPrevisualizadorMultimedia';
 import {
     Save,
     X,
@@ -14,6 +15,8 @@ import {
     Presentation,
     Clock,
     Upload,
+    Play,
+    FolderOpen,
 } from 'lucide-react';
 
 interface CursoReqItem {
@@ -25,6 +28,8 @@ interface ContenidoItem {
     titulo: string;
     tipo_recurso: 'Video' | 'Presentacion_Filminas';
     archivo_nombre: string;
+    url_streaming?: string | null;
+    peso_mb?: number;
 }
 
 interface ModuloForm {
@@ -65,11 +70,12 @@ interface CursoWizardData {
 
 interface Props {
     cursosDisponibles: CursoReqItem[];
+    repositorioSharepoint?: any[];
 }
 
 const DRAFT_STORAGE_KEY = 'anta_curso_create_draft_v1';
 
-export default function CreateCurso({ cursosDisponibles = [] }: Props) {
+export default function CreateCurso({ cursosDisponibles = [], repositorioSharepoint = [] }: Props) {
     const [step, setStep] = useState<1 | 2 | 3>(1);
     const [isSavingDraft, setIsSavingDraft] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -78,6 +84,12 @@ export default function CreateCurso({ cursosDisponibles = [] }: Props) {
 
     // Buscador de curso correlativo en Sección 1
     const [reqSearch, setReqSearch] = useState('');
+
+    const [uploadingKey, setUploadingKey] = useState<string | null>(null);
+    const [uploadProgress, setUploadProgress] = useState<number>(0);
+    const [repoCatalogo, setRepoCatalogo] = useState<any[]>(repositorioSharepoint);
+    const [previewItem, setPreviewItem] = useState<ContenidoItem | null>(null);
+
 
     // Estado inicial con 1 Módulo y 1 Pregunta por defecto
     const [wizardData, setWizardData] = useState<CursoWizardData>({
@@ -117,53 +129,116 @@ export default function CreateCurso({ cursosDisponibles = [] }: Props) {
         },
     });
 
-    const [recoveryBanner, setRecoveryBanner] = useState<CursoWizardData | null>(null);
-
-    const triggerToast = (msg: string) => {
+const triggerToast = (msg: string) => {
         setToastMsg(msg);
         setTimeout(() => setToastMsg(null), 3200);
     };
 
-    // Recuperar borrador local si se cerró accidentalmente
+    // Limpiar cualquier residuo viejo que haya quedado en el navegador
     useEffect(() => {
         try {
-            const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                if (parsed?.nombre?.trim()) {
-                    setRecoveryBanner(parsed);
-                }
-            }
+            localStorage.removeItem(DRAFT_STORAGE_KEY);
         } catch {
-            // Ignorar error de lectura
+            // Ignorar
         }
     }, []);
 
-    // Guardar en localStorage en cada cambio
-    useEffect(() => {
-        if (wizardData.nombre.trim() !== '') {
-            try {
-                localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(wizardData));
-            } catch {
-                // Ignorar
-            }
-        }
-    }, [wizardData]);
+    // Sincronizar Borrador con el Backend (Supabase) recibiendo el estado más reciente
+    const syncDraft = async (customData?: CursoWizardData): Promise<number | null> => {
+        const payload = customData ?? wizardData;
 
-    // Sincronizar Borrador con el Backend (Supabase)
-    const syncDraft = async () => {
-        if (!wizardData.nombre.trim()) return;
+        // Evitamos crear un borrador si el usuario abrió la pantalla y salió sin escribir nada ni subir archivos
+        const tieneContenidoSubido = payload.modulos.some((m) =>
+            m.contenidos.some(
+                (c) =>
+                    c.archivo_nombre !== 'Capacitacion_Inicial.pptx' &&
+                    c.archivo_nombre !== 'Video_Seguridad.mp4' &&
+                    c.archivo_nombre !== 'Diapositivas_EPP.pptx'
+            )
+        );
+
+        if (!payload.nombre.trim() && !tieneContenidoSubido && !payload.id_curso) {
+            return null;
+        }
+
         setIsSavingDraft(true);
         try {
-            const res = await axios.post('/cursos/borrador', wizardData);
-            if (res.data) {
-                setWizardData((prev) => ({ ...prev, id_curso: res.data.id_curso }));
+            const res = await axios.post('/cursos/borrador', payload);
+            if (res.data?.id_curso) {
+                setWizardData((prev) => ({
+                    ...prev,
+                    id_curso: res.data.id_curso,
+                    nombre: prev.nombre.trim() ? prev.nombre : res.data.nombre,
+                }));
                 setLastSavedTime(res.data.updated_at);
+                return res.data.id_curso;
             }
-        } catch {
-            triggerToast('Sin conexión: Borrador resguardado en el navegador.');
+        } catch (error) {
+            console.error('Error guardando borrador:', error);
+            triggerToast('No se pudo guardar el borrador en el servidor.');
         } finally {
             setIsSavingDraft(false);
+        }
+        return payload.id_curso;
+    };
+
+    const handleFileUpload = async (mIdx: number, cIdx: number, file: File) => {
+        const key = `${mIdx}-${cIdx}`;
+        setUploadingKey(key);
+        setUploadProgress(0);
+
+        const formData = new FormData();
+        formData.append('archivo', file);
+
+        try {
+            const res = await axios.post('/cursos/multimedia/upload', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                onUploadProgress: (progressEvent) => {
+                    if (progressEvent.total) {
+                        setUploadProgress(
+                            Math.round((progressEvent.loaded * 100) / progressEvent.total)
+                        );
+                    }
+                },
+            });
+
+            if (res.data?.ok && res.data?.archivo) {
+                const subido = res.data.archivo;
+
+                // Construimos el nuevo estado inmediatamente para enviarlo al borrador en BD
+                const copiaModulos = [...wizardData.modulos];
+                const copiaContenidos = [...copiaModulos[mIdx].contenidos];
+                copiaContenidos[cIdx] = {
+                    ...copiaContenidos[cIdx],
+                    archivo_nombre: subido.id_sharepoint_item,
+                    url_streaming: subido.url_streaming,
+                    peso_mb: subido.peso_mb,
+                };
+                copiaModulos[mIdx] = { ...copiaModulos[mIdx], contenidos: copiaContenidos };
+
+                const nuevoWizardData: CursoWizardData = {
+                    ...wizardData,
+                    modulos: copiaModulos,
+                };
+
+                setWizardData(nuevoWizardData);
+                setRepoCatalogo((prev) => [subido, ...prev]);
+
+                // Autoguardamos en la BD apenas se sube el video/PDF para que no se pierda el vínculo
+                await syncDraft(nuevoWizardData);
+
+                triggerToast(
+                    `Archivo "${subido.id_sharepoint_item}" (${subido.peso_mb} MB) subido y guardado en borrador.`
+                );
+            }
+        } catch (err: any) {
+            const msg =
+                err.response?.data?.message ||
+                'Error al subir el archivo. Verificá que sea .mp4 o .pdf (máx. 150MB).';
+            triggerToast(msg);
+        } finally {
+            setUploadingKey(null);
+            setUploadProgress(0);
         }
     };
 
@@ -361,7 +436,7 @@ export default function CreateCurso({ cursosDisponibles = [] }: Props) {
                 triggerToast('Completá el nombre del curso y su fecha de vencimiento.');
                 return;
             }
-            await syncDraft();
+            await syncDraft(wizardData);
             setStep(2);
         } else if (step === 2) {
             const sinTitulo = wizardData.modulos.some((m) => !m.titulo.trim());
@@ -369,17 +444,17 @@ export default function CreateCurso({ cursosDisponibles = [] }: Props) {
                 triggerToast('Todos los módulos deben tener un título.');
                 return;
             }
-            await syncDraft();
+            await syncDraft(wizardData);
             setStep(3);
         }
     };
 
     const handleClose = async () => {
-        if (wizardData.nombre.trim() !== '') {
-            await syncDraft();
-        }
-        localStorage.removeItem(DRAFT_STORAGE_KEY);
-        router.visit('/cursos');
+        await syncDraft(wizardData);
+        router.visit('/cursos', {
+            preserveState: false,
+            preserveScroll: false,
+        });
     };
 
     const handleFinish = (e: React.FormEvent) => {
@@ -402,9 +477,6 @@ export default function CreateCurso({ cursosDisponibles = [] }: Props) {
 
         setIsSubmitting(true);
         router.post('/cursos', { ...wizardData }, {
-            onSuccess: () => {
-                localStorage.removeItem(DRAFT_STORAGE_KEY);
-            },
             onError: () => {
                 setIsSubmitting(false);
                 triggerToast('Error al guardar el curso. Revisá los campos.');
@@ -427,44 +499,7 @@ export default function CreateCurso({ cursosDisponibles = [] }: Props) {
         >
             <Head title="Nuevo Curso · Panel de RRHH" />
 
-            {/* BANNER DE RECUPERACIÓN LOCAL */}
-            {recoveryBanner && (
-                <div className="max-w-[840px] mx-auto mb-6 rounded-[12px] bg-[#B5651D]/10 px-5 py-4 flex items-center justify-between border border-[#B5651D]/40">
-                    <div className="flex items-center gap-3">
-                        <Clock className="h-5 w-5 text-[#B5651D]" />
-                        <div className="text-[14px]">
-                            <b className="font-semibold text-[#1F2328] dark:text-[#ECEFEC]">
-                                Creación interrumpida detectada: "{recoveryBanner.nombre}"
-                            </b>
-                            <span className="block text-[#6B7280]">
-                                Podés retomar el borrador exactamente donde lo dejaste.
-                            </span>
-                        </div>
-                    </div>
-                    <div className="flex gap-2">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setWizardData(recoveryBanner);
-                                setRecoveryBanner(null);
-                            }}
-                            className="px-3 py-1.5 bg-[#2F6F5E] text-white rounded-[8px] text-[13px] font-medium cursor-pointer"
-                        >
-                            Recuperar borrador
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                localStorage.removeItem(DRAFT_STORAGE_KEY);
-                                setRecoveryBanner(null);
-                            }}
-                            className="px-3 py-1.5 border border-[#E9E9E7] bg-white text-[#6B7280] rounded-[8px] text-[13px] cursor-pointer"
-                        >
-                            Descartar
-                        </button>
-                    </div>
-                </div>
-            )}
+        
 
             <div className="w-full max-w-[840px] mx-auto bg-white dark:bg-[#1B1F1C] border border-[#E9E9E7] dark:border-[#2A302B] rounded-[16px] shadow-sm flex flex-col min-h-[calc(100vh-140px)]">
                 
@@ -736,78 +771,116 @@ export default function CreateCurso({ cursosDisponibles = [] }: Props) {
 
                                         {/* Lista de contenidos adjuntos (Videos / PowerPoints) */}
                                         <div className="grid gap-2.5">
-                                            {mod.contenidos.map((cont, cIdx) => (
-                                                <div
-                                                    key={cIdx}
-                                                    className="grid grid-cols-1 sm:grid-cols-[140px_1fr_auto_auto] items-center gap-2.5 bg-white dark:bg-[#1B1F1C] p-3 rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B]"
-                                                >
-                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium bg-[#EDF4F1] dark:bg-[#223029] text-[#2F6F5E] dark:text-[#6FBFA5]">
-                                                        {cont.tipo_recurso === 'Video' ? (
-                                                            <>
-                                                                <Video className="h-3.5 w-3.5" />
-                                                                Video (.mp4)
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <Presentation className="h-3.5 w-3.5" />
-                                                                PowerPoint
-                                                            </>
-                                                        )}
-                                                    </span>
+                                            {mod.contenidos.map((cont, cIdx) => {
+                                                const isUploadingThis = uploadingKey === `${mIdx}-${cIdx}`;
+                                                const repoMatch = repoCatalogo.find(
+                                                    (r) => r.id_sharepoint_item === cont.archivo_nombre
+                                                );
+                                                const resolvedUrl =
+                                                    cont.url_streaming || repoMatch?.url_streaming || null;
 
-                                                    <input
-                                                        type="text"
-                                                        value={cont.titulo}
-                                                        onChange={(e) =>
-                                                            updateContenido(
-                                                                mIdx,
-                                                                cIdx,
-                                                                'titulo',
-                                                                e.target.value
-                                                            )
-                                                        }
-                                                        placeholder="Título de la lección..."
-                                                        className="px-3 py-1.5 rounded-[6px] border border-[#E9E9E7] dark:border-[#2A302B] bg-transparent text-[14px]"
-                                                    />
-
-                                                    {/* Selector de archivo prototipo (PowerPoint o Video) */}
-                                                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] border border-[#E9E9E7] dark:border-[#2A302B] bg-[#F7F7F6] dark:bg-[#141714] text-[12px] text-[#1F2328] dark:text-[#ECEFEC] cursor-pointer truncate max-w-[200px]">
-                                                        <Upload className="h-3.5 w-3.5 text-[#2F6F5E] shrink-0" />
-                                                        <span className="truncate">
-                                                            {cont.archivo_nombre || 'Adjuntar archivo'}
-                                                        </span>
-                                                        <input
-                                                            type="file"
-                                                            accept={
-                                                                cont.tipo_recurso === 'Video'
-                                                                    ? 'video/*,.mp4'
-                                                                    : '.ppt,.pptx,.pdf'
-                                                            }
-                                                            onChange={(e) => {
-                                                                const file = e.target.files?.[0];
-                                                                if (file) {
-                                                                    updateContenido(
-                                                                        mIdx,
-                                                                        cIdx,
-                                                                        'archivo_nombre',
-                                                                        file.name
-                                                                    );
-                                                                }
-                                                            }}
-                                                            className="hidden"
-                                                        />
-                                                    </label>
-
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeContenido(mIdx, cIdx)}
-                                                        className="p-1.5 text-[#6B7280] hover:text-[#B3372B] cursor-pointer"
-                                                        title="Quitar contenido"
+                                                return (
+                                                    <div
+                                                        key={cIdx}
+                                                        className="grid grid-cols-1 sm:grid-cols-[135px_1fr_auto_auto_auto] items-center gap-2.5 bg-white dark:bg-[#1B1F1C] p-3 rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B]"
                                                     >
-                                                        <X className="h-4 w-4" />
-                                                    </button>
-                                                </div>
-                                            ))}
+                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium bg-[#EDF4F1] dark:bg-[#223029] text-[#2F6F5E] dark:text-[#6FBFA5]">
+                                                            {cont.tipo_recurso === 'Video' ? (
+                                                                <>
+                                                                    <Video className="h-3.5 w-3.5" />
+                                                                    Video (.mp4)
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Presentation className="h-3.5 w-3.5" />
+                                                                    PDF / Filminas
+                                                                </>
+                                                            )}
+                                                        </span>
+
+                                                        <input
+                                                            type="text"
+                                                            value={cont.titulo}
+                                                            onChange={(e) =>
+                                                                updateContenido(
+                                                                    mIdx,
+                                                                    cIdx,
+                                                                    'titulo',
+                                                                    e.target.value
+                                                                )
+                                                            }
+                                                            placeholder="Título de la lección..."
+                                                            className="px-3 py-1.5 rounded-[6px] border border-[#E9E9E7] dark:border-[#2A302B] bg-transparent text-[14px]"
+                                                        />
+
+                                                        {/* Botón de Subida Real desde PC al Repositorio */}
+                                                        <label
+                                                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] border text-[12px] cursor-pointer truncate max-w-[210px] ${
+                                                                resolvedUrl
+                                                                    ? 'border-[#2F7D4F]/40 bg-[#2F7D4F]/10 text-[#2F7D4F] font-semibold'
+                                                                    : 'border-[#E9E9E7] dark:border-[#2A302B] bg-[#F7F7F6] dark:bg-[#141714] text-[#1F2328] dark:text-[#ECEFEC]'
+                                                            }`}
+                                                            title={
+                                                                resolvedUrl
+                                                                    ? `Subido y verificado: ${cont.archivo_nombre}`
+                                                                    : 'Subir archivo desde tu computadora'
+                                                            }
+                                                        >
+                                                            <Upload className="h-3.5 w-3.5 shrink-0" />
+                                                            <span className="truncate">
+                                                                {isUploadingThis
+                                                                    ? `Subiendo ${uploadProgress}%...`
+                                                                    : cont.archivo_nombre || 'Subir archivo'}
+                                                            </span>
+                                                            <input
+                                                                type="file"
+                                                                disabled={isUploadingThis}
+                                                                accept={
+                                                                    cont.tipo_recurso === 'Video'
+                                                                        ? 'video/mp4,.mp4'
+                                                                        : '.pdf,.ppt,.pptx'
+                                                                }
+                                                                onChange={(e) => {
+                                                                    const file = e.target.files?.[0];
+                                                                    if (file) {
+                                                                        handleFileUpload(mIdx, cIdx, file);
+                                                                    }
+                                                                }}
+                                                                className="hidden"
+                                                            />
+                                                        </label>
+
+                                                        {/* Botón para Probar / Reproducir el archivo subido */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setPreviewItem({
+                                                                    ...cont,
+                                                                    url_streaming: resolvedUrl,
+                                                                })
+                                                            }
+                                                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-[6px] border text-[12px] font-medium cursor-pointer ${
+                                                                resolvedUrl
+                                                                    ? 'border-[#2F6F5E] bg-[#EDF4F1] text-[#2F6F5E]'
+                                                                    : 'border-[#E9E9E7] text-[#6B7280] bg-white'
+                                                            }`}
+                                                            title="Verificar y reproducir archivo"
+                                                        >
+                                                            <Play className="h-3.5 w-3.5" />
+                                                            Probar
+                                                        </button>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeContenido(mIdx, cIdx)}
+                                                            className="p-1.5 text-[#6B7280] hover:text-[#B3372B] cursor-pointer"
+                                                            title="Quitar contenido"
+                                                        >
+                                                            <X className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
 
                                         {/* Botones para adjuntar PowerPoint o Video al módulo */}
@@ -1096,6 +1169,14 @@ export default function CreateCurso({ cursosDisponibles = [] }: Props) {
                     {toastMsg}
                 </div>
             )}
+        <ModalPrevisualizadorMultimedia
+            isOpen={Boolean(previewItem)}
+            onClose={() => setPreviewItem(null)}
+            tituloLeccion={previewItem?.titulo || ''}
+            tipoRecurso={previewItem?.tipo_recurso || 'Video'}
+            archivoNombre={previewItem?.archivo_nombre || ''}
+            urlStreaming={previewItem?.url_streaming || null}
+        />
         </AppLayout>
     );
 }

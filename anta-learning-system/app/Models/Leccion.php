@@ -2,7 +2,7 @@
 // app/Models/Leccion.php
 
 namespace App\Models;
-
+use App\Services\MultimediaService;
 use Illuminate\Database\Eloquent\Model;
 
 class Leccion extends Model
@@ -17,6 +17,24 @@ class Leccion extends Model
         'id_sharepoint_item',
         'orden',
     ];
+
+    protected $appends = [
+        'url_recurso',
+        'archivo_verificado',
+    ];
+
+    public function getUrlRecursoAttribute(): ?string
+    {
+        if ($this->tipo_recurso === 'Cuestionario') {
+            return null;
+        }
+        return app(MultimediaService::class)->obtenerUrl($this->id_sharepoint_item);
+    }
+
+    public function getArchivoVerificadoAttribute(): bool
+    {
+        return $this->url_recurso !== null;
+    }
 
     public function modulo()
     {

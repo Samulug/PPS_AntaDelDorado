@@ -42,8 +42,10 @@ Route::middleware(['auth', 'verified', 'dashboard.access'])->group(function () {
 
     // Rutas de Cursos
     Route::resource('cursos',CursoController::class);
+    Route::post('/cursos/borrador', [CursoController::class, 'saveDraft'])->name('cursos.draft');
     Route::patch('/cursos/{id}/status', [CursoController::class, 'updateStatus'])->name('cursos.status');
-    
+    Route::post('/cursos/multimedia/upload', [CursoController::class, 'uploadMultimedia'])
+    ->name('cursos.multimedia.upload');
     });
 
 require __DIR__.'/auth.php';
