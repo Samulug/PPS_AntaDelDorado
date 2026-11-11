@@ -1,7 +1,8 @@
 <?php
 
 namespace App\Http\Controllers;
-
+use Illuminate\Support\Facades\Auth;
+use App\Models\AuditAdmin;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -71,6 +72,16 @@ class UserController extends Controller
         $user = User::create($validated);
         $user->assignRole($validated['rol']);
 
+        if (Auth::id()) {
+            AuditAdmin::create([
+                'id_usuario'          => Auth::id(),
+                'id_usuario_afectado' => $user->id,
+                'accion'              => "Alta de usuario ({$user->rol})",
+                'fecha_evento'        => now(),
+                'estado_resultante'   => 'Activo',
+            ]);
+        }
+
         return redirect()->route('colaboradores.index')
             ->with('success', 'Colaborador dado de alta exitosamente. Su contraseña inicial es su DNI.');
     }
@@ -117,6 +128,16 @@ public function edit($id): Response
         $user->update($validated);
         $user->syncRoles([$validated['rol']]);
 
+        if (Auth::id()) {
+            AuditAdmin::create([
+                'id_usuario'          => Auth::id(),
+                'id_usuario_afectado' => $user->id,
+                'accion'              => 'Actualización de ficha y datos de legajo',
+                'fecha_evento'        => now(),
+                'estado_resultante'   => $validated['estado_operativo'],
+            ]);
+        }
+
         return redirect()->route('colaboradores.show', $user->id)
             ->with('success', 'Datos del colaborador actualizados correctamente.');
     }
@@ -131,6 +152,16 @@ public function edit($id): Response
 
         $user->update(['estado_operativo' => $validated['estado_operativo']]);
 
+        if (Auth::id()) {
+            AuditAdmin::create([
+                'id_usuario'          => Auth::id(),
+                'id_usuario_afectado' => $user->id,
+                'accion'              => "Cambio de estado operativo a {$validated['estado_operativo']}",
+                'fecha_evento'        => now(),
+                'estado_resultante'   => $validated['estado_operativo'],
+            ]);
+        }
+
         return redirect()->back()->with('success', "Estado actualizado a {$validated['estado_operativo']}.");
     }
 
@@ -142,6 +173,16 @@ public function edit($id): Response
             'password'             => Hash::make($user->dni),
             'must_change_password' => true,
         ]);
+
+        if (Auth::id()) {
+            AuditAdmin::create([
+                'id_usuario'          => Auth::id(),
+                'id_usuario_afectado' => $user->id,
+                'accion'              => 'Restablecimiento manual de contraseña al DNI',
+                'fecha_evento'        => now(),
+                'estado_resultante'   => $user->estado_operativo,
+            ]);
+        }
 
         return redirect()->back()->with('success', 'Contraseña restablecida al DNI.');
     }

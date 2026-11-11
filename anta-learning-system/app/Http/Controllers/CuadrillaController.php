@@ -1,7 +1,8 @@
 <?php
 
 namespace App\Http\Controllers;
-
+use Illuminate\Support\Facades\Auth;
+use App\Models\AuditAdmin;
 use App\Models\Cuadrilla;
 use App\Models\Curso;
 use App\Models\ProgresoCurso;
@@ -108,6 +109,7 @@ class CuadrillaController extends Controller
      */
     public function store(Request $request)
     {
+
         $validated = $request->validate([
             'id_cuadrilla'     => 'nullable|exists:cuadrilla,id_cuadrilla',
             'nombre_cuadrilla' => 'required|string|max:255',
@@ -117,9 +119,29 @@ class CuadrillaController extends Controller
             'colaboradores.*'  => 'exists:users,id',
             'cursos'           => 'nullable|array',
             'cursos.*'         => 'exists:curso,id_curso',
-        ]);
+        ]);        
 
         DB::transaction(function () use ($validated) {
+            $esEdicion = !empty($validated['id_cuadrilla']);
+
+            if ($esEdicion) {
+                $cuadrilla = Cuadrilla::findOrFail($validated['id_cuadrilla']);
+                $cuadrilla->update([
+                    'nombre_cuadrilla'     => $validated['nombre_cuadrilla'],
+                    'labor_asociada'       => $validated['labor_asociada'],
+                    'estado'               => $validated['estado'],
+                    'cursos_borrador_json' => $validated['cursos'] ?? [],
+                ]);
+            } else {
+                $cuadrilla = Cuadrilla::create([
+                    'nombre_cuadrilla'     => $validated['nombre_cuadrilla'],
+                    'labor_asociada'       => $validated['labor_asociada'],
+                    'fecha_creacion'       => now()->toDateString(),
+                    'estado'               => $validated['estado'],
+                    'cursos_borrador_json' => $validated['cursos'] ?? [],
+                ]);
+            }
+
             if (!empty($validated['id_cuadrilla'])) {
                 $cuadrilla = Cuadrilla::findOrFail($validated['id_cuadrilla']);
                 $cuadrilla->update([
@@ -144,6 +166,8 @@ class CuadrillaController extends Controller
             }
             $cuadrilla->colaboradores()->sync($syncData);
 
+            
+
             // Si la cuadrilla pasa a Activa, generamos las inscripciones en progreso_curso
             if ($validated['estado'] === 'Activa' && !empty($validated['cursos'])) {
                 foreach ($validated['colaboradores'] as $userId) {
@@ -162,6 +186,18 @@ class CuadrillaController extends Controller
                         );
                     }
                 }
+            }
+
+            if (Auth::id()) {
+                AuditAdmin::create([
+                    'id_usuario'        => Auth::id(),
+                    'id_cuadrilla'      => $cuadrilla->id_cuadrilla,
+                    'accion'            => $esEdicion
+                        ? "Actualización de cuadrilla ({$cuadrilla->nombre_cuadrilla})"
+                        : "Creación de cuadrilla ({$cuadrilla->nombre_cuadrilla})",
+                    'fecha_evento'      => now(),
+                    'estado_resultante' => $validated['estado'], // <-- Antes decía estado_curso
+                ]);
             }
         });
 
@@ -183,6 +219,16 @@ class CuadrillaController extends Controller
      */
     public function destroy(Cuadrilla $cuadrilla)
     {
+        $nombre = $cuadrilla->nombre_cuadrilla;
+        if (Auth::id()) {
+            AuditAdmin::create([
+                'id_usuario'        => Auth::id(),
+                'id_cuadrilla'      => null, // Será null porque se elimina de la BD
+                'accion'            => "Eliminación de cuadrilla: {$nombre}",
+                'fecha_evento'      => now(),
+                'estado_resultante' => 'Inactiva',
+            ]);
+        }
         $cuadrilla->delete();
 
         return redirect()->route('cuadrillas.index')

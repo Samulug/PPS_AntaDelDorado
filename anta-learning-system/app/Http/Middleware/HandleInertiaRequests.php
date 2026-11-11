@@ -32,7 +32,13 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $request->user(),
+                'user' => $request->user() ? [
+                    'id'              => $request->user()->id,
+                    'name'            => $request->user()->name,
+                    'nombre_completo' => $request->user()->nombre_completo,
+                    'rol'             => $request->user()->rol,
+                    'foto_url'        => $request->user()->foto ? asset('storage/' . $request->user()->foto) : null,
+                ] : null,
             ],
         ];
     }

@@ -129,6 +129,9 @@ export default function AppLayout({
 
     const nombreUsuario =
         auth?.user?.nombre_completo || auth?.user?.name || 'Sofía Reynoso';
+
+    
+
     const rolUsuario = auth?.user?.rol || 'SuperAdmin';
     const iniciales = nombreUsuario
         .split(' ')
@@ -136,6 +139,8 @@ export default function AppLayout({
         .join('')
         .slice(0, 2)
         .toUpperCase();
+
+    const photoUser = auth?.user?.foto_url;
 
     return (
         <div className="min-h-screen bg-[#F7F7F6] dark:bg-[#141714] text-[#1F2328] dark:text-[#ECEFEC] font-sans antialiased selection:bg-[#EDF4F1] selection:text-[#2F6F5E]">
@@ -210,9 +215,17 @@ export default function AppLayout({
                     <Link
                         href="/profile"
                         aria-label="Mi perfil"
-                        className="grid h-[39px] w-[39px] shrink-0 place-items-center rounded-full bg-[#EDF4F1] dark:bg-[#223029] text-[#2F6F5E] dark:text-[#6FBFA5] font-semibold text-[13px]"
+                        className="grid h-[39px] w-[39px] shrink-0 place-items-center overflow-hidden rounded-full bg-[#EDF4F1] dark:bg-[#223029] text-[#2F6F5E] dark:text-[#6FBFA5] font-semibold text-[13px] border border-[#2F6F5E]/20"
                     >
-                        {iniciales}
+                        {photoUser ? (
+                            <img 
+                                src={photoUser} 
+                                alt={nombreUsuario} 
+                                className="h-full w-full object-cover" 
+                            />
+                        ) : (
+                            iniciales
+                        )}
                     </Link>
 
                     <Link

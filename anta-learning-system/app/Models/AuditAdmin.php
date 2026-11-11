@@ -1,5 +1,4 @@
 <?php
-// app/Models/AuditAdmin.php
 
 namespace App\Models;
 
@@ -13,6 +12,8 @@ class AuditAdmin extends Model
     protected $fillable = [
         'id_usuario',
         'id_curso',
+        'id_cuadrilla',
+        'id_usuario_afectado',
         'accion',
         'fecha_evento',
         'estado_resultante',
@@ -30,5 +31,15 @@ class AuditAdmin extends Model
     public function curso()
     {
         return $this->belongsTo(Curso::class, 'id_curso', 'id_curso');
+    }
+
+    public function cuadrilla()
+    {
+        return $this->belongsTo(Cuadrilla::class, 'id_cuadrilla', 'id_cuadrilla');
+    }
+
+    public function usuarioAfectado()
+    {
+        return $this->belongsTo(User::class, 'id_usuario_afectado', 'id');
     }
 }
