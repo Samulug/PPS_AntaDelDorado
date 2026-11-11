@@ -17,6 +17,10 @@ use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
+use App\Mail\CursoEstadoActualizadoMail;
+use App\Mail\OperarioBloqueadoMail;
+use Illuminate\Support\Facades\Mail;
+
 class ProfileController extends Controller
 {
     /**
@@ -197,5 +201,46 @@ class ProfileController extends Controller
         elseif (preg_match('/safari/i', $userAgent)) $browser = 'Safari';
 
         return "{$browser} en {$os}";
+    }
+
+    public function sendTestEmail(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'email_destino' => ['required', 'email'],
+            'tipo_prueba'   => ['required', 'in:curso,bloqueo,ambos'],
+        ]);
+
+        $admin = $request->user();
+        $destino = $validated['email_destino'];
+
+        if (in_array($validated['tipo_prueba'], ['curso', 'ambos'], true)) {
+            $dataCurso = [
+                'creador_nombre'  => $admin->nombre_completo ?? 'Técnica en HyS',
+                'curso_nombre'    => 'Seguridad en Maquinaria Agrícola y Uso de EPP',
+                'nuevo_estado'    => 'Activo (Publicado)',
+                'accion'          => 'Publicación en Catálogo',
+                'ejecutor_nombre' => 'Belec Gainza',
+                'ejecutor_rol'    => 'SuperAdmin',
+                'fecha'           => now()->format('d/m/Y H:i'),
+            ];
+            Mail::to($destino)->send(new CursoEstadoActualizadoMail($dataCurso));
+        }
+
+        if (in_array($validated['tipo_prueba'], ['bloqueo', 'ambos'], true)) {
+            $dataBloqueo = [
+                'operario_nombre' => 'Luis Alberto Salvatierra',
+                'operario_legajo' => '1042',
+                'nodo'            => $admin->zona_geografica_establecimient ?? 'Las Lajitas',
+                'curso_nombre'    => 'Manejo Seguro de Agroquímicos',
+                'intentos'        => 3,
+                'ultima_nota'     => 40,
+            ];
+            Mail::to($destino)->send(new OperarioBloqueadoMail($dataBloqueo));
+        }
+
+        return Redirect::route('profile.edit')->with(
+            'success',
+            "Correo(s) de prueba enviado(s) correctamente a {$destino}."
+        );
     }
 }

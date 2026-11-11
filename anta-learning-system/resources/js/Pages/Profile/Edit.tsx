@@ -142,6 +142,26 @@ export default function ProfileEdit({
     const {can} = useAuth();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    const [testEmailAddress, setTestEmailAddress] = useState(perfilAdmin?.email || '');
+    const [testEmailType, setTestEmailType] = useState<'curso' | 'bloqueo' | 'ambos'>('ambos');
+    const [sendingMail, setSendingMail] = useState(false);
+
+    const handleSendTestEmail = (e: React.FormEvent) => {
+        e.preventDefault();
+        setSendingMail(true);
+        router.post(
+            '/profile/test-email',
+            {
+                email_destino: testEmailAddress,
+                tipo_prueba: testEmailType,
+            },
+            {
+                preserveScroll: true,
+                onFinish: () => setSendingMail(false),
+            }
+        );
+    };
+
     const triggerToast = (msg: string) => {
         setToastMsg(msg);
         setTimeout(() => setToastMsg(null), 3200);
@@ -287,7 +307,7 @@ export default function ProfileEdit({
 
                     {/* NAVEGACIÓN POR PESTAÑAS (TABS) */}
                     {/* Contenedor con scroll horizontal oculto para móviles */}
-                    <div className="flex flex-nowrap overflow-x-auto gap-2 border-t border-[#E9E9E7] dark:border-[#2A302B] mt-6 pt-4 pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                    <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 border-t border-[#E9E9E7] dark:border-[#2A302B] mt-6 pt-4 pb-2">
                         <button
                             type="button"
                             onClick={() => setActiveTab('identidad')}
@@ -763,7 +783,52 @@ export default function ProfileEdit({
                             )}
                         </div>
                     </div>
-                )}
+                    )}
+                    <div className="bg-white dark:bg-[#1B1F1C] border border-[#E9E9E7] dark:border-[#2A302B] rounded-[16px] p-5 shadow-sm">
+                        <h3 className="text-[15px] font-bold text-[#1F2328] dark:text-[#ECEFEC] mb-1 flex items-center gap-2">
+                            <Mail className="w-4 h-4 text-[#2F6F5E] dark:text-[#6FBFA5]" />
+                            Probar Envío de Alertas Críticas por Email
+                        </h3>
+                        <p className="text-[12.5px] text-[#6B7280] dark:text-[#9AA39D] mb-4">
+                            Envía una simulación de correo a tu cuenta personal para verificar la conexión SMTP y el diseño de las plantillas.
+                        </p>
+
+                        <form onSubmit={handleSendTestEmail} className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                            <label className="grid gap-1 text-[12px] font-medium text-[#6B7280]">
+                                Correo destinatario de prueba
+                                <input
+                                    type="email"
+                                    required
+                                    value={testEmailAddress}
+                                    onChange={(e) => setTestEmailAddress(e.target.value)}
+                                    placeholder="tucorreo@ejemplo.com"
+                                    className="w-full rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-[#F7F7F6] dark:bg-[#141714] px-3 py-2 text-[13px] text-[#1F2328] dark:text-[#ECEFEC] focus:border-[#2F6F5E] focus:outline-none"
+                                />
+                            </label>
+
+                            <label className="grid gap-1 text-[12px] font-medium text-[#6B7280]">
+                                Escenario a simular
+                                <select
+                                    value={testEmailType}
+                                    onChange={(e) => setTestEmailType(e.target.value as 'curso' | 'bloqueo' | 'ambos')}
+                                    className="w-full rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-[#F7F7F6] dark:bg-[#141714] px-3 py-2 text-[13px] text-[#1F2328] dark:text-[#ECEFEC] focus:border-[#2F6F5E] focus:outline-none"
+                                >
+                                    <option value="ambos">Ambos correos (Curso + Bloqueo)</option>
+                                    <option value="curso">1. Cambio de estado de Curso</option>
+                                    <option value="bloqueo">2. Operario Bloqueado (3 intentos)</option>
+                                </select>
+                            </label>
+
+                            <button
+                                type="submit"
+                                disabled={sendingMail}
+                                className="h-[38px] w-full rounded-[8px] bg-[#2F6F5E] hover:brightness-95 text-white text-[13px] font-semibold transition cursor-pointer disabled:opacity-50"
+                            >
+                                {sendingMail ? 'Enviando...' : 'Enviar correo de prueba'}
+                            </button>
+                        </form>
+                    </div>
+                
                 
                 {/* =====================================================================
                     PESTAÑA 6: ADMINISTRADORES AGREGADOS

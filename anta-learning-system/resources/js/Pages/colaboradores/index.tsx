@@ -151,6 +151,19 @@ export default function ColaboradoresIndex({ users = [], filters = {} }: Props) 
         return 'bg-[#B3372B]/12 text-[#B3372B] dark:bg-[#EE8274]/15 dark:text-[#EE8274]';
     };
 
+    const handleExportExcel = () => {
+        const params = new URLSearchParams({
+            buscar: colabApplied.search || '',
+            rol: colabApplied.rol !== 'Todos' ? colabApplied.rol : '',
+            zona: colabApplied.nodo !== 'Todos' ? colabApplied.nodo : '',
+            estado: colabApplied.estado !== 'Todos' ? colabApplied.estado : '',
+            orden: 'nombre_completo',
+            direccion: colabApplied.sort === 'za' ? 'desc' : 'asc',
+        }).toString();
+
+        window.location.href = `/colaboradores/export?${params}`;
+    };
+
     return (
         <AppLayout title="Colaboradores">
             <Head title="Colaboradores · Panel de RRHH" />
@@ -165,6 +178,15 @@ export default function ColaboradoresIndex({ users = [], filters = {} }: Props) 
                         Altas, bajas, auditoría y seguimiento individual del personal operativo.
                     </p>
                 </div>
+                {can('exportar_reportes') && (
+                    <button
+                        type="button"
+                        onClick={handleExportExcel}
+                        className="inline-flex items-center gap-2 min-h-[38px] px-4 py-[7px] rounded-[8px] border border-[#2F6F5E] bg-white dark:bg-[#1B1F1C] text-[#2F6F5E] dark:text-[#6FBFA5] font-medium text-[15px] hover:bg-[#EDF4F1] dark:hover:bg-[#223029] transition cursor-pointer"
+                    >
+                        Exportar a Excel (.xlsx)
+                    </button>
+                )}
                 {can('crear_colaborador') && (
                 <div>
                     <Link
@@ -312,8 +334,8 @@ export default function ColaboradoresIndex({ users = [], filters = {} }: Props) 
                 </div>
 
                 {/* TABLA COMPACTA SIN SCROLL HORIZONTAL */}
-                <div className="w-full">
-                    <table className="w-full table-fixed border-collapse text-left">
+                <div className="w-full overflow-x-auto">
+                    <table className="w-full border-collapse text-left">
                         <thead>
                             <tr className="border-b border-[#E9E9E7] dark:border-[#2A302B] bg-[#F7F7F6]/60 dark:bg-[#141714]/50">
                                 <th className="w-[30%] py-3 px-5 font-medium text-[#6B7280] dark:text-[#9AA39D] text-[13px]">

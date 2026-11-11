@@ -12,6 +12,10 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
+use App\Exports\ColaboradoresExport;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Maatwebsite\Excel\Facades\Excel;
+
 #[Middleware('permission:ver_metricas')]
 class DashboardController extends Controller
 {
@@ -75,7 +79,9 @@ class DashboardController extends Controller
 
         // top 5 operarios bloqueados
         //eager loading: solo los datos necesarios usando (with)
+        // top 5 operarios bloqueados
         $colaboradoresBloqueados = ProgresoCurso::with([
+                // Corregido: Solicitamos 'id' porque así se llama la PK en la tabla users
                 'usuario:id,nombre_completo,legajo,zona_geografica_establecimient',
                 'curso:id_curso,nombre'
             ])
@@ -107,5 +113,87 @@ class DashboardController extends Controller
             'colaboradoresBloqueados' => $colaboradoresBloqueados,
             'cursosProblematicos'     => $cursosProblematicos,
         ]);
+    }
+
+    /**
+     * Genera y descarga (o previsualiza) el Reporte Ejecutivo en PDF del Dashboard (A4 Horizontal)
+     */
+    public function exportPdf(Request $request)
+    {
+        $zona = $request->input('zona');
+
+        // Reutilizamos las métricas filtradas por zona
+        $usuariosActivosQuery = User::where('rol', 'Operario')
+            ->where('estado_operativo', 'Activo')
+            ->when($zona, fn($q) => $q->where('zona_geografica_establecimient', $zona));
+
+        $totalActivos = $usuariosActivosQuery->count();
+
+        $progresosQuery = ProgresoCurso::with(['usuario', 'curso'])
+            ->when($zona, function ($q) use ($zona) {
+                $q->whereHas('usuario', fn($u) => $u->where('zona_geografica_establecimient', $zona));
+            });
+
+        $indiceCumplimiento = round((clone $progresosQuery)->avg('porcentaje_avance') ?? 0);
+
+        $colaboradoresBloqueados = (clone $progresosQuery)
+            ->whereIn('estado', ['Bloqueado', 'Vencido', 'En_Curso'])
+            ->orderByRaw("CASE WHEN estado = 'Bloqueado' THEN 1 WHEN estado = 'Vencido' THEN 2 ELSE 3 END")
+            ->get();
+
+        $alertasBloqueados = (clone $progresosQuery)->whereIn('estado', ['Bloqueado', 'Vencido'])->count();
+        $ticketsPendientes = TicketConsulta::where('estado_ticket', 'Pendiente')->count();
+
+        $cursosProblematicos = Curso::withCount([
+            'progresos as bloqueos' => function ($q) use ($zona) {
+                $q->where('estado', 'Bloqueado')
+                  ->when($zona, fn($sub) => $sub->whereHas('usuario', fn($u) => $u->where('zona_geografica_establecimient', $zona)));
+            }
+        ])->orderByDesc('bloqueos')->take(8)->get()->map(fn($c) => [
+            'id_curso' => $c->id_curso,
+            'nombre'   => $c->nombre,
+            'bloqueos' => $c->bloqueos,
+        ]);
+
+        $avancePorCuadrilla = Cuadrilla::with('progresosCursos')->get()->map(fn($cuad) => [
+            'name'   => $cuad->nombre_cuadrilla,
+            'avance' => round($cuad->progresosCursos->avg('porcentaje_avance') ?? 0),
+        ]);
+
+        $pdf = Pdf::loadView('reportes.dashboard-pdf', [
+            'zona'                    => $zona,
+            'fechaGeneracion'         => now()->format('d/m/Y H:i'),
+            'emitidoPor'              => $request->user()?->nombre_completo ?? 'RRHH Admin',
+            'metrics'                 => [
+                'total_activos'       => $totalActivos,
+                'indice_cumplimiento' => $indiceCumplimiento,
+                'alertas_bloqueados'  => $alertasBloqueados,
+                'tickets_pendientes'  => $ticketsPendientes,
+            ],
+            'colaboradoresBloqueados' => $colaboradoresBloqueados,
+            'cursosProblematicos'     => $cursosProblematicos,
+            'avancePorCuadrilla'      => $avancePorCuadrilla,
+        ])->setPaper('a4', 'landscape'); // Orientación A4 horizontal como pide la guía
+
+        $sufijoZona = $zona ? '-' . \Illuminate\Support\Str::slug($zona) : '-global';
+        return $pdf->download("reporte-inducciones{$sufijoZona}-" . now()->format('Ymd') . ".pdf");
+    }
+
+    /**
+     * Descarga el Excel desde el Dashboard respetando el filtro de Zona Geográfica
+     */
+    public function exportExcel(Request $request)
+    {
+        $filtros = [
+            'zona'      => $request->input('zona', ''),
+            'orden'     => 'nombre_completo',
+            'direccion' => 'asc',
+        ];
+
+        $sufijoZona = $filtros['zona'] ? '_' . \Illuminate\Support\Str::slug($filtros['zona']) : '_global';
+        return Excel::download(
+            new ColaboradoresExport($filtros),
+            "nomina_inducciones{$sufijoZona}_" . now()->format('Ymd') . ".xlsx"
+        );
     }
 }

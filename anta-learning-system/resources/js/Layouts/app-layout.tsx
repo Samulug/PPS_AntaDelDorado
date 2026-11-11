@@ -159,85 +159,76 @@ export default function AppLayout({
         <div className="min-h-screen bg-[#F7F7F6] dark:bg-[#141714] text-[#1F2328] dark:text-[#ECEFEC] font-sans antialiased selection:bg-[#EDF4F1] selection:text-[#2F6F5E]">
             {title && <Head title={`${title} · Panel de RRHH`} />}
 
-            <header className="sticky top-0 z-30 flex h-[60px] items-center gap-20 bg-white dark:bg-[#1B1F1C] border-b border-[#E9E9E7] dark:border-[#2A302B] px-4 md:px-8">
-                <button
-                    type="button"
-                    onClick={() => setSidebarOpen(!sidebarOpen)}
-                    className="rounded-lg p-1.5 text-[#6B7280] hover:bg-[#F7F7F6] dark:hover:bg-[#141714] lg:hidden"
-                    aria-label="Abrir menú"
-                >
-                    {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-                </button>
+            <header className="sticky top-0 z-30 flex min-h-[60px] flex-wrap sm:flex-nowrap items-center justify-between gap-4 bg-white dark:bg-[#1B1F1C] border-b border-[#E9E9E7] dark:border-[#2A302B] px-4 md:px-8 py-2 sm:py-0 w-full">
+                
+                {/* Lado Izquierdo: Menú Hamburguesa + Logo */}
+                <div className="flex items-center gap-3 shrink-0">
+                    <button
+                        type="button"
+                        onClick={() => setSidebarOpen(!sidebarOpen)}
+                        className="rounded-lg p-1.5 text-[#6B7280] hover:bg-[#F7F7F6] dark:hover:bg-[#141714] lg:hidden"
+                        aria-label="Abrir menú"
+                    >
+                        {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                    </button>
 
-                <Link href="/dashboard" className="flex items-center gap-3 shrink-0">
-                    <b className="font-semibold text-[16px] tracking-tight text-[#1F2328] dark:text-[#ECEFEC]">
-                        Anta del Dorado
-                    </b>
-                    <span className="hidden sm:inline text-[15px] text-[#6B7280] dark:text-[#9AA39D]">
-                        Panel de Recursos Humanos
-                    </span>
-                </Link>
-
-                {/* Buscador central del prototipo */}
-                {can('listar_colaboradores') && (
-                <div className="flex-1 flex items-center">
-                    <div className="relative hidden md:block w-full max-w-[420px]">
-                        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7280]" />
-                        <input
-                            type="search"
-                            value={globalSearch}
-                            onChange={(e) => setGlobalSearch(e.target.value)}
-                            onKeyDown={handleGlobalSearch}
-                            placeholder="Buscar colaborador por DNI, nombre o legajo"
-                            aria-label="Buscar colaborador"
-                            className="w-full rounded-[8px] border border-transparent bg-[#F7F7F6] dark:bg-[#141714] pl-10 pr-3.5 py-1.5 text-[14px] text-[#1F2328] dark:text-[#ECEFEC] placeholder-[#6B7280] transition-colors focus:border-[#2F6F5E] focus:bg-white dark:focus:bg-[#1B1F1C] focus:outline-none"
-                        />
-                    </div>
+                    <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
+                        <b className="font-semibold text-[15px] sm:text-[16px] tracking-tight text-[#1F2328] dark:text-[#ECEFEC]">
+                            Anta del Dorado
+                        </b>
+                        <span className="hidden lg:inline text-[15px] text-[#6B7280] dark:text-[#9AA39D]">
+                            Panel de Recursos Humanos
+                        </span>
+                    </Link>
                 </div>
+
+                {/* Centro: Buscador Oculto en Móvil para ahorrar espacio */}
+                {can('listar_colaboradores') && (
+                    <div className="hidden lg:flex flex-1 items-center justify-center max-w-[420px] px-4">
+                        <div className="relative w-full">
+                            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7280]" />
+                            <input
+                                type="search"
+                                value={globalSearch}
+                                onChange={(e) => setGlobalSearch(e.target.value)}
+                                onKeyDown={handleGlobalSearch}
+                                placeholder="Buscar colaborador..."
+                                aria-label="Buscar colaborador"
+                                className="w-full rounded-[8px] border border-transparent bg-[#F7F7F6] dark:bg-[#141714] pl-10 pr-3.5 py-1.5 text-[14px] focus:border-[#2F6F5E] focus:bg-white focus:outline-none transition-colors"
+                            />
+                        </div>
+                    </div>
                 )}
 
-                {/*Botón Tema + Usuario + Avatar + Salir */}
-                <div className="flex items-center gap-4">
+                {/* Lado Derecho: Controles y Perfil */}
+                <div className="flex items-center gap-2 sm:gap-4 shrink-0">
                     <button
                         type="button"
                         onClick={toggleTheme}
-                        className="inline-flex items-center gap-1.5 min-h-[32px] px-3 py-1 rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[14px] font-medium text-[#1F2328] dark:text-[#ECEFEC] hover:bg-[#F7F7F6] dark:hover:bg-[#141714] transition-colors cursor-pointer"
-                        aria-label="Cambiar tema claro u oscuro"
+                        className="inline-flex items-center justify-center h-8 w-8 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5 rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[#1F2328] dark:text-[#ECEFEC] hover:bg-[#F7F7F6] transition-colors cursor-pointer"
+                        aria-label="Cambiar tema"
                     >
-                        {isDark ? (
-                            <>
-                                <Sun className="h-3.5 w-3.5 text-[#E3A15A]" />
-                            </>
-                        ) : (
-                            <>
-                                <Moon className="h-3.5 w-3.5 text-[#6B7280]" />
-                            </>
-                        )}
+                        {isDark ? <Sun className="h-4 w-4 text-[#E3A15A]" /> : <Moon className="h-4 w-4 text-[#6B7280]" />}
                     </button>
 
                     <Link
                         href="/profile"
-                        className="hidden sm:block text-right leading-[1] cursor-pointer"
+                        className="hidden sm:block text-right leading-[1.1] cursor-pointer"
                     >
-                        <b className="text-[14px] font-semibold text-[#1F2328] dark:text-[#ECEFEC] block">
+                        <b className="text-[13px] font-semibold text-[#1F2328] dark:text-[#ECEFEC] block">
                             {nombreUsuario}
                         </b>
-                        <small className="text-[12px] text-[#6B7280] dark:text-[#9AA39D]">
+                        <small className="text-[11.5px] text-[#6B7280] dark:text-[#9AA39D]">
                             {rolUsuario}
                         </small>
                     </Link>
 
                     <Link
                         href="/profile"
-                        aria-label="Mi perfil"
-                        className="grid h-[39px] w-[39px] shrink-0 place-items-center overflow-hidden rounded-full bg-[#EDF4F1] dark:bg-[#223029] text-[#2F6F5E] dark:text-[#6FBFA5] font-semibold text-[13px] border border-[#2F6F5E]/20"
+                        className="grid h-[34px] w-[34px] sm:h-[39px] sm:w-[39px] shrink-0 place-items-center overflow-hidden rounded-full bg-[#EDF4F1] dark:bg-[#223029] text-[#2F6F5E] dark:text-[#6FBFA5] font-semibold text-[12px] sm:text-[13px] border border-[#2F6F5E]/20"
                     >
                         {photoUser ? (
-                            <img 
-                                src={photoUser} 
-                                alt={nombreUsuario} 
-                                className="h-full w-full object-cover" 
-                            />
+                            <img src={photoUser} alt={nombreUsuario} className="h-full w-full object-cover" />
                         ) : (
                             iniciales
                         )}
@@ -248,7 +239,7 @@ export default function AppLayout({
                         method="post"
                         as="button"
                         title="Cerrar sesión"
-                        className="rounded-[8px] p-1.5 text-[#6B7280] hover:bg-[#F7F7F6] dark:hover:bg-[#141714] hover:text-[#B3372B] transition-colors cursor-pointer"
+                        className="rounded-[8px] p-1.5 text-[#6B7280] hover:bg-[#F7F7F6] hover:text-[#B3372B] transition-colors cursor-pointer hidden sm:block"
                     >
                         <LogOut className="h-4 w-4" />
                     </Link>
@@ -303,7 +294,7 @@ export default function AppLayout({
                 </aside>
 
                 {/* ÁREA CENTRAL DE TRABAJO */}
-                <main className="w-full max-w-[1200px] px-4 py-6 sm:px-8 md:px-14 ">
+                <main className="w-full max-w-[1200px] px-4 py-6 sm:px-8 md:px-14 min-w-0 verflow-x-hidden">
                     {children}
                 </main>
             </div>

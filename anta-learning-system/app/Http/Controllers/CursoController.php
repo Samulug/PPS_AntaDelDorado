@@ -17,6 +17,9 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
+use Illuminate\Support\Facades\Mail;
+use App\Mail\CursoEstadoActualizadoMail;
+
 class CursoController extends Controller
 {
     /**
@@ -216,7 +219,7 @@ class CursoController extends Controller
             'cuestionario'    => 'required|array',
         ]);
 
-        DB::transaction(function () use ($curso, $validated) {
+        DB::transaction(function () use ($curso, $validated, $request) {
             $curso->update([
                 'nombre'             => $validated['nombre'],
                 'descripcion'        => $validated['descripcion'] ?? '',
@@ -236,6 +239,28 @@ class CursoController extends Controller
                     'fecha_evento'      => now(),
                     'estado_resultante' => $validated['estado_curso'],
                 ]);
+                if ($curso->wasChanged('estado_curso')) {
+                    $registroCreacion = AuditAdmin::with('administrador')
+                        ->where('id_curso', $curso->id_curso)
+                        ->orderBy('fecha_evento', 'asc')
+                        ->first();
+
+                    $creador = $registroCreacion?->administrador;
+                    $ejecutor = $request->user();
+
+                    // Notificamos al creador original (y que no sea él mismo quien hizo el cambio)
+                    if ($creador && $creador->id !== $ejecutor->id && !empty($creador->email)) {
+                        Mail::to($creador->email)->send(new CursoEstadoActualizadoMail([
+                            'creador_nombre'  => $creador->nombre_completo,
+                            'curso_nombre'    => $curso->nombre,
+                            'nuevo_estado'    => $curso->estado_curso,
+                            'accion'          => 'Cambio de estado en catálogo',
+                            'ejecutor_nombre' => $ejecutor->nombre_completo,
+                            'ejecutor_rol'    => $ejecutor->rol,
+                            'fecha'           => now()->format('d/m/Y H:i'),
+                        ]));
+                    }
+                }
             }
         });
 
@@ -243,6 +268,10 @@ class CursoController extends Controller
             ->with('success', 'Curso actualizado correctamente.');
     }
 
+    /**
+     * Cambio rápido de estado (Activo, Borrador, Inactivo) desde la tabla o desde el Show.
+     */
+    #[Middleware('permission:editar_curso')]
     /**
      * Cambio rápido de estado (Activo, Borrador, Inactivo) desde la tabla o desde el Show.
      */
@@ -269,10 +298,33 @@ class CursoController extends Controller
             ]);
         }
 
+        // LÓGICA DE NOTIFICACIÓN POR EMAIL AL CREADOR ORIGINAL
+        if ($curso->wasChanged('estado_curso')) {
+            $registroCreacion = AuditAdmin::with('administrador')
+                ->where('id_curso', $curso->id_curso)
+                ->orderBy('fecha_evento', 'asc')
+                ->first();
+
+            $creador = $registroCreacion?->administrador;
+            $ejecutor = $request->user();
+
+            // Notificamos al creador original (y que no sea él mismo quien hizo el cambio)
+            if ($creador && $creador->id !== $ejecutor->id && !empty($creador->email)) {
+                Mail::to($creador->email)->send(new CursoEstadoActualizadoMail([
+                    'creador_nombre'  => $creador->nombre_completo,
+                    'curso_nombre'    => $curso->nombre,
+                    'nuevo_estado'    => $curso->estado_curso,
+                    'accion'          => 'Cambio rápido de estado en catálogo',
+                    'ejecutor_nombre' => $ejecutor->nombre_completo,
+                    'ejecutor_rol'    => $ejecutor->rol,
+                    'fecha'           => now()->format('d/m/Y H:i'),
+                ]));
+            }
+        }
+
         return redirect()->back()
             ->with('success', "Estado del curso actualizado a {$validated['estado_curso']}.");
     }
-
     /**
      * Eliminación definitiva del curso.
      */

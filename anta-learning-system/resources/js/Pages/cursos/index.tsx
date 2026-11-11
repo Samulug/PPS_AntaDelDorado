@@ -348,11 +348,11 @@ export default function CursosIndex({ cursos = [] }: Props) {
                 </div>
 
                 {/* TABLA DE VISTA RÁPIDA SIN SCROLL HORIZONTAL */}
-                <div className="w-full">
-                    <table className="w-full table-fixed border-collapse text-left">
+                <div className="w-full overflow-x-auto">
+                    <table className="w-full border-collapse text-left">
                         <thead>
                             <tr className="border-b border-[#E9E9E7] dark:border-[#2A302B] bg-[#F7F7F6]/60 dark:bg-[#141714]/50">
-<th className="w-[32%] py-3 px-5 font-medium text-[#6B7280] dark:text-[#9AA39D] text-[13px]">
+                            <th className="w-[32%] min-w-[220px] py-3 px-5 font-medium text-[#6B7280] dark:text-[#9AA39D] text-[13px]">
                                     Nombre del Curso y Correlatividad
                                 </th>
                                 <th className="w-[15%] py-3 px-4 font-medium text-[#6B7280] dark:text-[#9AA39D] text-[13px]">

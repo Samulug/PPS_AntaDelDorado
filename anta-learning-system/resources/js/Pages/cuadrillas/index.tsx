@@ -717,8 +717,8 @@ const processedCuadrillas = useMemo(() => {
                 </div>
 
                 {/* TABLA DE CUADRILLAS COMPACTA (SIN SCROLL HORIZONTAL) */}
-                <div className="w-full">
-                    <table className="w-full table-fixed border-collapse text-left">
+                <div className="w-full overflow-x-auto">
+                    <table className="w-full border-collapse text-left">
                         <thead>
                             <tr className="border-b border-[#E9E9E7] dark:border-[#2A302B] bg-[#F7F7F6]/60 dark:bg-[#141714]/50">
                                 <th className="w-[30%] py-3 px-5 font-medium text-[#6B7280] dark:text-[#9AA39D] text-[13px]">

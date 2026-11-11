@@ -26,16 +26,24 @@ Route::get('/', function () {
 Route::middleware(['auth', 'verified', 'dashboard.access'])->group(function () {
 
     Route::get('/dashboard',[DashboardController::class,'index'])->name('dashboard');
-    
+        Route::get('/dashboard/export-pdf', [DashboardController::class, 'exportPdf'])
+        ->name('dashboard.export.pdf');
+    Route::get('/dashboard/export-excel', [DashboardController::class, 'exportExcel'])
+        ->name('dashboard.export.excel');
+
     //Perfil
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::post('/profile/test-email', [ProfileController::class, 'sendTestEmail'])
+    ->name('profile.test-email');
 
     //rutas colaboradores
     Route::resource('colaboradores',UserController::class);
     Route::patch('/colaboradores/{id}/status', [UserController::class, 'updateStatus'])->name('colaboradores.status');
     Route::post('/colaboradores/{id}/reset-password', [UserController::class, 'forcePasswordReset'])->name('colaboradores.reset-password');
+        Route::get('/colaboradores/export', [UserController::class, 'export'])
+        ->name('colaboradores.export');
     
     // Rutas para Cuadrillas
     Route::resource('cuadrillas',CuadrillaController::class);
@@ -59,6 +67,7 @@ Route::middleware(['auth', 'verified', 'dashboard.access'])->group(function () {
     Route::get('/administradores/create', [RoleController::class, 'createAdmin'])->name('roles.admins.create'); 
     Route::post('/roles/administradores', [RoleController::class, 'storeAdmin'])->name('roles.admins.store');
     Route::patch('/roles/administradores/{user}', [RoleController::class, 'updateAdmin'])->name('roles.admins.update');
+
     });
 
 require __DIR__.'/auth.php';

@@ -12,6 +12,8 @@ use Inertia\Response;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Attributes\Controllers\Middleware;
 use Spatie\Permission\Models\Role;
+use App\Exports\ColaboradoresExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class UserController extends Controller
 {
@@ -192,5 +194,41 @@ class UserController extends Controller
         }
 
         return redirect()->back()->with('success', 'Contraseña restablecida al DNI.');
+    }
+
+    /**
+     * Exporta la tabla de Colaboradores aplicando los mismos filtros y ordenamientos activos en React
+     */
+    public function export(Request $request)
+    {
+        $buscar = trim($request->input('buscar', ''));
+        $rol = $request->input('rol', '');
+        $zona = $request->input('zona', '');
+        $estado = $request->input('estado', '');
+        $orden = $request->input('orden', 'nombre_completo');
+        $direccion = strtolower($request->input('direccion', 'asc'));
+
+        $camposPermitidos = ['nombre_completo', 'legajo', 'dni', 'rol', 'estado_operativo'];
+        if (!in_array($orden, $camposPermitidos, true)) {
+            $orden = 'nombre_completo';
+        }
+
+        if (!in_array($direccion, ['asc', 'desc'], true)) {
+            $direccion = 'asc';
+        }
+
+        $filtros = [
+            'buscar'    => $buscar,
+            'rol'       => $rol,
+            'zona'      => $zona,
+            'estado'    => $estado,
+            'orden'     => $orden,
+            'direccion' => $direccion,
+        ];
+
+        return Excel::download(
+            new ColaboradoresExport($filtros),
+            'directorio_colaboradores_' . now()->format('Ymd_His') . '.xlsx'
+        );
     }
 }
