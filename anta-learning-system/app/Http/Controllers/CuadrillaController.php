@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
+use Illuminate\Routing\Attributes\Controllers\Middleware;
 use Illuminate\Support\Facades\Auth;
 use App\Models\AuditAdmin;
 use App\Models\Cuadrilla;
@@ -17,6 +18,7 @@ class CuadrillaController extends Controller
     /**
      * Renderiza la página dedicada exclusivamente a cuadrillas de Entrenamiento.
      */
+    #[Middleware('permission:listar_cuadrillas')]
     public function index(): Response
     {
         $cuadrillas = Cuadrilla::with([
@@ -49,9 +51,48 @@ class CuadrillaController extends Controller
         ]);
     }
 
+    #[Middleware('permission:listar_cuadrillas')]
+    public function show($id){
+        $cuadrilla = Cuadrilla::with([
+            'colaboradores:id,nombre_completo,dni,legajo,rol,zona_geografica_establecimient,centro_costo,estado_operativo',
+            'progresosCursos.curso:id_curso,nombre,tiempo_vigencia'
+        ])->findOrFail($id);
+
+        return Inertia::render('cuadrillas/show',[
+            'cuadrilla = $cuadrilla',
+        ]);
+    }
+
+    #[Middleware('permission:editar_cuadrilla')]
+    public function updateStatus(Request $request, $id): \Illuminate\Http\RedirectResponse
+    {
+        $cuadrilla = Cuadrilla::findOrFail($id);
+
+        $validated = $request->validate([
+            'estado' => 'required|in:Activa,Borrador,Inactiva',
+        ]);
+
+        $cuadrilla->update([
+            'estado' => $validated['estado'],
+        ]);
+
+        if (Auth::id()) {
+            AuditAdmin::create([
+                'id_usuario'        => Auth::id(),
+                'id_cuadrilla'      => $cuadrilla->id_cuadrilla,
+                'accion'            => "Cambio rápido de estado a {$validated['estado']} (Cuadrilla: {$cuadrilla->nombre_cuadrilla})",
+                'fecha_evento'      => now(),
+                'estado_resultante' => $validated['estado'],
+            ]);
+        }
+
+        return redirect()->back()->with('success', "Estado de la cuadrilla actualizado a {$validated['estado']}.");
+    }
+
     /**
      * Autoguarda o actualiza una cuadrilla en estado "Borrador" mientras se navega entre los pasos.
      */
+    #[Middleware('permission:crear_cuadrilla')]
     public function saveDraft(Request $request)
     {
         $validated = $request->validate([
@@ -107,6 +148,7 @@ class CuadrillaController extends Controller
     /**
      * Finaliza la creación (o activación desde un borrador) de la cuadrilla y asigna los cursos.
      */
+    #[Middleware('permission:crear_cuadrilla')]
     public function store(Request $request)
     {
 
@@ -208,6 +250,7 @@ class CuadrillaController extends Controller
     /**
      * Actualiza una cuadrilla existente.
      */
+    #[Middleware('permission:editar_cuadrilla')]
     public function update(Request $request, Cuadrilla $cuadrilla)
     {
         $request->merge(['id_cuadrilla' => $cuadrilla->id_cuadrilla]);
@@ -217,6 +260,7 @@ class CuadrillaController extends Controller
     /**
      * Elimina una cuadrilla (Borrador, Activa o Inactiva).
      */
+    #[Middleware('permission:eliminar_cuadrilla')]
     public function destroy(Cuadrilla $cuadrilla)
     {
         $nombre = $cuadrilla->nombre_cuadrilla;
@@ -235,6 +279,7 @@ class CuadrillaController extends Controller
             ->with('success', 'Cuadrilla eliminada permanentemente.');
     }
 
+    #[Middleware('permission:crear_cuadrilla')]
     public function create(): Response
     {
         $users = User::whereIn('rol', ['Operario', 'Supervisor'])
@@ -262,6 +307,7 @@ class CuadrillaController extends Controller
     /**
      * Renderiza la página del Wizard para Editar (o continuar un Borrador)
      */
+    #[Middleware('permission:editar_cuadrilla')]
     public function edit(Cuadrilla $cuadrilla): Response
     {
         // Cargamos las relaciones necesarias

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import AppLayout from '@/Layouts/app-layout';
+import { useAuth } from '@/hooks/use-auth';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     BarChart,
@@ -97,7 +98,8 @@ export default function Dashboard({
     const [rangoFecha, setRangoFecha] = useState('30 días');
     const [busquedaTabla, setBusquedaTabla] = useState('');
     const [toastMsg, setToastMsg] = useState<string | null>(null);
-
+    const { can } = useAuth();
+    
     const mostrarToast = (texto: string) => {
         setToastMsg(texto);
         setTimeout(() => setToastMsg(null), 2800);
@@ -156,6 +158,7 @@ export default function Dashboard({
             )}
 
             {/* 1. ENCABEZADO DE PÁGINA Y EXPORTACIÓN */}
+            {can('exportar_reportes') && (
             <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
                 <div className="flex-1 min-w-[260px]">
                     <h1 className="text-[26px] font-semibold tracking-[-0.01em] text-[#1F2328] dark:text-[#ECEFEC] m-0 mb-1">
@@ -190,6 +193,7 @@ export default function Dashboard({
                     </button>
                 </div>
             </div>
+            )}
 
             {/* 2. BARRA DE FILTROS EN TARJETA (Nodo productivo, Departamento, Rango de fechas) */}
             <div className="rounded-[12px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] px-7 py-6 flex flex-wrap items-end gap-5">

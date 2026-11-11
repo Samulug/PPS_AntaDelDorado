@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { Head, router, usePage } from '@inertiajs/react';
 import AppLayout from '@/Layouts/app-layout';
+import { useAuth } from '@/hooks/use-auth';
 import {
     User,
     ShieldCheck,
@@ -138,7 +139,7 @@ export default function ProfileEdit({
     const [auditFilter, setAuditFilter] = useState<'TODOS' | 'CURSOS' | 'CUADRILLAS' | 'PERSONAL'>('TODOS');
     const [auditSearch, setAuditSearch] = useState('');
     const [toastMsg, setToastMsg] = useState<string | null>(flash?.success || null);
-
+    const {can} = useAuth();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const triggerToast = (msg: string) => {
@@ -312,7 +313,7 @@ export default function ProfileEdit({
                             <History className="h-4 w-4" />
                             Auditoría
                         </button>
-
+                        {can('responder_tickets') && (
                         <button
                             type="button"
                             onClick={() => setActiveTab('soporte')}
@@ -325,7 +326,8 @@ export default function ProfileEdit({
                             <MessageSquare className="h-4 w-4" />
                             Soporte
                         </button>
-
+                        )}
+                        {can('enviar_notificacion_push') && (
                         <button
                             type="button"
                             onClick={() => setActiveTab('notificaciones')}
@@ -338,6 +340,7 @@ export default function ProfileEdit({
                             <Bell className="h-4 w-4" />
                             Notificaciones Emitidas
                         </button>
+                        )}
 
                         <button
                             type="button"
@@ -351,7 +354,7 @@ export default function ProfileEdit({
                             <Lock className="h-4 w-4" />
                             Accesos
                         </button>
-
+                        {can('listar_roles_admins') && (
                         <button
                             type="button"
                             onClick={() => setActiveTab('administradores')}
@@ -364,6 +367,7 @@ export default function ProfileEdit({
                             <UserPlus className="h-4 w-4" />
                             Administradores
                         </button>
+                        )}
                     </div>
                 </div>
 

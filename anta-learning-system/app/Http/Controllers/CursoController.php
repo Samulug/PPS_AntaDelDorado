@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
+use Illuminate\Routing\Attributes\Controllers\Middleware;
 use App\Services\MultimediaService;
 use App\Models\AuditAdmin;
 use App\Models\Cuestionario;
@@ -21,6 +22,7 @@ class CursoController extends Controller
     /**
      * Listado principal de cursos para la tabla rápida.
      */
+    #[Middleware('permission:listar_cursos')]
     public function index(): Response
     {
         $cursos = Curso::with([
@@ -38,6 +40,7 @@ class CursoController extends Controller
     /**
      * Vista de creación procedimental (3 secciones) con soporte de borrador.
      */
+    #[Middleware('permission:crear_curso')]
     public function create(MultimediaService $multimedia): Response
     {
         $cursosDisponibles = Curso::where('estado_curso', 'Activo')
@@ -53,6 +56,7 @@ class CursoController extends Controller
     /**
      * Autoguarda el curso en estado "Borrador" al avanzar de sección o salir.
      */
+    #[Middleware('permission:crear_curso')]
     public function saveDraft(Request $request)
     {
         $validated = $request->validate([
@@ -103,6 +107,7 @@ class CursoController extends Controller
     /**
      * Guarda finalmente el curso desde el creador.
      */
+    #[Middleware('permission:crear_curso')]
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
@@ -159,6 +164,8 @@ class CursoController extends Controller
     /**
      * Ficha completa de un curso (Show).
      */
+
+    #[Middleware('permission:listar_cursos')]
     public function show($id): Response
     {
         $curso = Curso::with([
@@ -174,7 +181,7 @@ class CursoController extends Controller
     /**
      * Vista de edición con salto libre entre secciones (Update).
      */
-    public function edit($id, MultimediaService $multimedia): Response
+    #[Middleware('permission:editar_curso')]    public function edit($id, MultimediaService $multimedia): Response
     {
         $curso = Curso::with([
             'modulos.lecciones.cuestionario.preguntas.opciones',
@@ -194,6 +201,7 @@ class CursoController extends Controller
     /**
      * Actualiza un curso existente y redirige a su vista Show.
      */
+    #[Middleware('permission:editar_curso')]
     public function update(Request $request, $id): RedirectResponse
     {
         $curso = Curso::findOrFail($id);
@@ -238,6 +246,7 @@ class CursoController extends Controller
     /**
      * Cambio rápido de estado (Activo, Borrador, Inactivo) desde la tabla o desde el Show.
      */
+    #[Middleware('permission:editar_curso')]
     public function updateStatus(Request $request, $id): RedirectResponse
     {
         $curso = Curso::findOrFail($id);
@@ -267,6 +276,7 @@ class CursoController extends Controller
     /**
      * Eliminación definitiva del curso.
      */
+    #[Middleware('permission:eliminar_curso')]
     public function destroy($id): RedirectResponse
     {
         $curso = Curso::findOrFail($id);

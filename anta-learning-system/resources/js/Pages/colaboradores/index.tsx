@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import AppLayout from '@/Layouts/app-layout';
+import { useAuth } from '@/hooks/use-auth';
 import {
     Search,
     Filter,
@@ -37,6 +38,7 @@ const ESTADOS_COLAB = ['Activo', 'Suspendido', 'Inactivo', 'Vacaciones', 'Lesion
 export default function ColaboradoresIndex({ users = [], filters = {} }: Props) {
     const { flash } = usePage<any>().props;
     const [toastMsg, setToastMsg] = useState<string | null>(null);
+    const { can } = useAuth();
 
     const triggerToast = (msg: string) => {
         setToastMsg(msg);
@@ -163,6 +165,7 @@ export default function ColaboradoresIndex({ users = [], filters = {} }: Props) 
                         Altas, bajas, auditoría y seguimiento individual del personal operativo.
                     </p>
                 </div>
+                {can('crear_colaborador') && (
                 <div>
                     <Link
                         href="/colaboradores/create"
@@ -172,6 +175,7 @@ export default function ColaboradoresIndex({ users = [], filters = {} }: Props) 
                         Nuevo colaborador
                     </Link>
                 </div>
+                )}
             </div>
 
             {/* CONTENEDOR DE TABLA */}
@@ -336,7 +340,7 @@ export default function ColaboradoresIndex({ users = [], filters = {} }: Props) 
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter') router.visit(`/colaboradores/${colab.id}`);
                                         }}
-                                        className="hover:bg-[#F7F7F6] dark:hover:bg-[#141 714] transition-colors cursor-pointer"
+                                        className="hover:bg-[#F7F7F6] dark:hover:bg-[#141714] transition-colors cursor-pointer"
                                     >
                                         <td className="py-3.5 px-5 align-middle">
                                             <b className="font-semibold text-[#1F2328] dark:text-[#ECEFEC] block truncate">

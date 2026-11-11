@@ -7,5 +7,5 @@ export function useAuth() {
     const can = (permission: string): boolean => {
         return permissions.includes(permission);
     };
-    return { can, user: auth?.user };
+    return { can, user: auth?.user, roles: auth?.roles || []};
 }

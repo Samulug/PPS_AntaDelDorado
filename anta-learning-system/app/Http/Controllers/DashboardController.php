@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
-
+use Illuminate\Routing\Attributes\Controllers\Middleware;
 use App\Models\Curso;
 use App\Models\Cuadrilla;
 use App\Models\ProgresoCurso;
@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
+#[Middleware('permission:ver_metricas')]
 class DashboardController extends Controller
 {
     public function index(Request $request): Response

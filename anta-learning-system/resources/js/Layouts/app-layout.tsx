@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import type { BreadcrumbItem } from '@/types';
+import { useAuth } from '@/hooks/use-auth';
 import {
     Home,
     BookOpen,
@@ -34,6 +35,7 @@ export default function AppLayout({
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [globalSearch, setGlobalSearch] = useState(filters?.search || '');
     const [isDark, setIsDark] = useState(false);
+    const { can } = useAuth();
 
     useEffect(() => {
         if (filters?.search !== undefined) {
@@ -81,24 +83,28 @@ export default function AppLayout({
             href: '/dashboard',
             icon: Home,
             current: url === '/dashboard' || url.startsWith('/dashboard?'),
+            permission: 'ver_metricas',
         },
         {
             name: 'Cursos y contenido',
             href: '/cursos',
             icon: BookOpen,
             current: url.startsWith('/cursos'),
+            permission: 'listar_cursos',
         },
         {
             name: 'Colaboradores',
             href: '/colaboradores',
             icon: Users,
-            current: url.startsWith('/colaboradores')
+            current: url.startsWith('/colaboradores'),
+            permission: 'listar_colaboradores',
         },
         {
             name: 'Cuadrillas',
             href: '/cuadrillas',
             icon: HardHat,
             current: url.startsWith('/cuadrillas'),
+            permission: 'listar_cuadrillas',
         },
         {
             name: 'Consultas',
@@ -106,18 +112,21 @@ export default function AppLayout({
             icon: MessageSquare,
             current: url.startsWith('/tickets'),
             badge: auth?.ticketsPendientesCount || undefined,
+            permission: 'listar_tickets',
         },
         {
             name: 'Notificaciones push',
             href: '/notificaciones',
             icon: Bell,
             current: url.startsWith('/notificaciones'),
+            permission: 'listar_notificaciones',
         },
         {
             name: 'Roles y accesos',
             href: '/roles',
             icon: ShieldCheck,
             current: url.startsWith('/roles'),
+            permission: 'listar_roles_admins',
         },
         {
             name: 'Mi perfil',
@@ -126,6 +135,10 @@ export default function AppLayout({
             current: url.startsWith('/profile') || url.startsWith('/settings'),
         },
     ];
+
+    const visibleNavigation = navigation.filter(
+        (item) => !item.permission || can(item.permission)
+    );
 
     const nombreUsuario =
         auth?.user?.nombre_completo || auth?.user?.name || 'Sofía Reynoso';
@@ -166,6 +179,7 @@ export default function AppLayout({
                 </Link>
 
                 {/* Buscador central del prototipo */}
+                {can('listar_colaboradores') && (
                 <div className="flex-1 flex items-center">
                     <div className="relative hidden md:block w-full max-w-[420px]">
                         <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7280]" />
@@ -180,6 +194,7 @@ export default function AppLayout({
                         />
                     </div>
                 </div>
+                )}
 
                 {/*Botón Tema + Usuario + Avatar + Salir */}
                 <div className="flex items-center gap-4">
@@ -257,7 +272,7 @@ export default function AppLayout({
                     }`}
                 >
                     <nav className="grid gap-1.5" aria-label="Secciones">
-                        {navigation.map((item) => {
+                        {visibleNavigation.map((item) => {
                             const Icon = item.icon;
                             return (
                                 <Link

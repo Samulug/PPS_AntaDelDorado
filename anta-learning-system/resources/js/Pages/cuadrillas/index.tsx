@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import axios from 'axios';
+import { useAuth } from '@/hooks/use-auth';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import AppLayout from '@/Layouts/app-layout';
 import {
@@ -81,7 +82,7 @@ export default function CuadrillasIndex({
 }: Props) {
     const { flash } = usePage<any>().props;
     const [toastMsg, setToastMsg] = useState<string | null>(null);
-
+    const {can} = useAuth();
     const triggerToast = (msg: string) => {
         setToastMsg(msg);
         setTimeout(() => setToastMsg(null), 3200);
@@ -577,7 +578,9 @@ const processedCuadrillas = useMemo(() => {
                     <p className="text-[#6B7280] dark:text-[#9AA39D] text-[15px] m-0">
                         Agrupamiento operativo paso a paso con resguardo automático de borradores.
                     </p>
+                
                 </div>
+                {can('crear_cuadrilla') && (
                     <Link
                         href="/cuadrillas/create"
                         className="inline-flex items-center gap-2 min-h-[38px] px-[18px] py-[7px] rounded-[8px] border border-[#2F6F5E] bg-[#2F6F5E] dark:bg-[#6FBFA5] dark:border-[#6FBFA5] text-white dark:text-[#0E1A15] font-medium text-[15px] hover:brightness-95 transition cursor-pointer"
@@ -585,6 +588,7 @@ const processedCuadrillas = useMemo(() => {
                         <Users className="h-4 w-4" />
                         Nueva cuadrilla
                     </Link>
+                )}
             </div>
 
             {/* CONTENEDOR DE FILTROS Y TABLA COMPACTA */}
@@ -726,7 +730,7 @@ const processedCuadrillas = useMemo(() => {
                                 <th className="w-[20%] py-3 px-4 font-medium text-[#6B7280] dark:text-[#9AA39D] text-[13px]">
                                     Dotación y Estado
                                 </th>
-                                <th className="w-[24%] py-3 px-5 font-medium text-[#6B7280] dark:text-[#9AA39D] text-[13px] text-right">
+                                <th className="w-[24%] py-3 px-16 font-medium text-[#6B7280] dark:text-[#9AA39D] text-[13px] ">
                                     Acciones
                                 </th>
                             </tr>
@@ -749,7 +753,17 @@ const processedCuadrillas = useMemo(() => {
                                     return (
                                         <tr
                                             key={cuad.id_cuadrilla}
-                                            className="hover:bg-[#F7F7F6] dark:hover:bg-[#141714] transition-colors"
+                                            tabIndex={0}
+                                            onClick={(e) => {
+                                                // Evitar navegar si se hace clic en botones, checkboxes o selectores
+                                                if (!(e.target as HTMLElement).closest('button, select, input, a')) {
+                                                    router.visit(`/cuadrillas/${cuad.id_cuadrilla}`);
+                                                }
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') router.visit(`/cuadrillas/${cuad.id_cuadrilla}`);
+                                            }}
+                                            className="hover:bg-[#F7F7F6] dark:hover:bg-[#141714] transition-colors cursor-pointer"
                                         >
                                             {/* Columna 1: Nombre + Labor */}
                                             <td className="py-3.5 px-5 align-middle">
@@ -797,8 +811,10 @@ const processedCuadrillas = useMemo(() => {
                                             </td>
 
                                             {/* Columna 4: Botones de Acción */}
-                                            <td className="py-3.5 px-5 align-middle text-right">
+                                            {can('editar_cuadrilla') && (
+                                            <td className="py-3.5 px-16 align-middle">
                                                 <div className="inline-flex items-center justify-end gap-1.5 flex-wrap">
+                                                    {can('editar_cuadrilla') && (
                                                     <Link
                                                         href={`/cuadrillas/${cuad.id_cuadrilla}/edit`}
                                                         className={`inline-flex items-center gap-1 px-2.5 py-1 min-h-[30px] rounded-[8px] border text-[13px] font-medium cursor-pointer ${
@@ -810,6 +826,8 @@ const processedCuadrillas = useMemo(() => {
                                                         <Edit3 className="h-3.5 w-3.5" />
                                                         {estadoStr === 'Borrador' ? 'Continuar' : 'Editar'}
                                                     </Link>
+                                                    )}
+                                                    {can('eliminar_cuadrilla') && (
                                                     <button
                                                         type="button"
                                                         onClick={() => openDeleteDoubleCheck(cuad)}
@@ -818,8 +836,10 @@ const processedCuadrillas = useMemo(() => {
                                                         <Trash2 className="h-3.5 w-3.5" />
                                                         Eliminar
                                                     </button>
+                                                    )}
                                                 </div>
                                             </td>
+                                            )}
                                         </tr>
                                     );
                                 })

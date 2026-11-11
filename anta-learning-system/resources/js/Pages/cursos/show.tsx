@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import AppLayout from '@/Layouts/app-layout';
+import { useAuth } from '@/hooks/use-auth';
 import ModalPrevisualizadorMultimedia from '@/Components/ModalPrevisualizadorMultimedia';
 import {
     ArrowLeft,
@@ -19,6 +20,7 @@ export default function CursoShow({ curso }: any) {
     const { flash } = usePage<any>().props;
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     const [previewLeccion, setPreviewLeccion] = useState<any | null>(null);
+    const { can } = useAuth();
 
     useEffect(() => {
         if (flash?.success) {
@@ -118,6 +120,7 @@ export default function CursoShow({ curso }: any) {
                     </div>
 
                     {/* Controles rápidos: Activar, Borrador, Desactivar y Modificar */}
+                    {can('editar_curso') && (
                     <div className="flex items-center gap-2 flex-wrap">
                         <div className="inline-flex rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] p-1 gap-1">
                             {(['Activo', 'Borrador', 'Inactivo'] as const).map((est) => (
@@ -148,6 +151,7 @@ export default function CursoShow({ curso }: any) {
                             Modificar curso
                         </Link>
                     </div>
+                    )}
                 </div>
 
                 {/* TARJETA 1: METADATOS DEL CURSO */}

@@ -4,10 +4,17 @@ import './bootstrap';
 import { createInertiaApp } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
+import { router } from '@inertiajs/react';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
-
+let t0 = 0;
+router.on('start', () => { t0 = performance.now(); });
+router.on('navigate', (e) => {
+  console.log(`[Inertia] ${e.detail.page.url} → ${(performance.now() - t0).toFixed(0)} ms`);
+});
 createInertiaApp({
+    
+
     title: (title) => `${title} - ${appName}`,
     resolve: (name) =>
         resolvePageComponent(

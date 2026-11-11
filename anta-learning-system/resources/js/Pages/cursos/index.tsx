@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import AppLayout from '@/Layouts/app-layout';
+import { useAuth } from '@/hooks/use-auth';
+
 import {
     Search,
     Filter,
@@ -36,6 +38,7 @@ interface Props {
 }
 
 export default function CursosIndex({ cursos = [] }: Props) {
+    const { can } = useAuth();  
     const { flash } = usePage<any>().props;
     const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -206,6 +209,7 @@ export default function CursosIndex({ cursos = [] }: Props) {
                     </p>
                 </div>
 
+                {can('crear_curso') && (
                 <div>
                     <Link
                         href="/cursos/create"
@@ -215,6 +219,7 @@ export default function CursosIndex({ cursos = [] }: Props) {
                         Nuevo curso
                     </Link>
                 </div>
+                )}
             </div>
 
             {/* CONTENEDOR DE FILTROS Y TABLA */}
@@ -359,9 +364,11 @@ export default function CursosIndex({ cursos = [] }: Props) {
                                 <th className="w-[14%] py-3 px-4 font-medium text-[#6B7280] dark:text-[#9AA39D] text-[13px]">
                                     Estado
                                 </th>
+                                {can('editar_curso') && (
                                 <th className="w-[24%] py-3 px-4 font-medium text-[#6B7280] dark:text-[#9AA39D] text-[13px] text-center">
                                     Acciones
                                 </th>
+                                )}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[#E9E9E7] dark:divide-[#2A302B] text-[14px]">
@@ -399,33 +406,27 @@ export default function CursosIndex({ cursos = [] }: Props) {
 
                                         {/* Columna 4: Selector rápido de Estado */}
                                         <td className="py-3.5 px-4 align-middle">
-                                            <select
-                                                value={curso.estado_curso}
-                                                onChange={(e) =>
-                                                    handleQuickStatusChange(curso, e.target.value)
-                                                }
-                                                className={`inline-block px-2.5 py-0.5 rounded-full text-[12px] font-medium border-0 cursor-pointer outline-none ${getChipClasses(
-                                                    curso.estado_curso
-                                                )}`}
-                                            >
-                                                <option value="Activo">Activo</option>
-                                                <option value="Borrador">Borrador</option>
-                                                <option value="Inactivo">Inactivo</option>
-                                            </select>
+                                            {can('editar_curso') ? (
+                                                <select
+                                                    value={curso.estado_curso}
+                                                    onChange={(e) => handleQuickStatusChange(curso, e.target.value)}
+                                                    className={`inline-block px-2.5 py-0.5 rounded-full text-[12px] font-medium border-0 cursor-pointer outline-none ${getChipClasses(curso.estado_curso)}`}
+                                                >
+                                                    <option value="Activo">Activo</option>
+                                                    <option value="Borrador">Borrador</option>
+                                                    <option value="Inactivo">Inactivo</option>
+                                                </select>
+                                            ) : (
+                                                <span className={`inline-block px-2.5 py-0.5 rounded-full text-[12px] font-medium ${getChipClasses(curso.estado_curso)}`}>
+                                                    {curso.estado_curso}
+                                                </span>
+                                            )}
                                         </td>
 
                                         {/* Columna 5: Acciones */}
+                                        {can('editar_curso') && (
                                         <td className="py-3.5 px-4 align-middle text-center">
                                             <div className="inline-flex items-center justify-center gap-1.5 flex-nowrap">
-                                                <Link
-                                                    href={`/cursos/${curso.id_curso}`}
-                                                    className="inline-flex items-center gap-1 px-2.5 py-1 min-h-[30px] rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[13px] font-medium text-[#1F2328] dark:text-[#ECEFEC]"
-                                                    title="Ver detalle del curso"
-                                                >
-                                                    <Eye className="h-3.5 w-3.5 shrink-0" />
-                                                    Ver
-                                                </Link>
-
                                                 <Link
                                                     href={`/cursos/${curso.id_curso}/edit`}
                                                     className={`inline-flex items-center gap-1 px-2.5 py-1 min-h-[30px] rounded-[8px] border text-[13px] font-medium whitespace-nowrap ${
@@ -449,6 +450,7 @@ export default function CursosIndex({ cursos = [] }: Props) {
                                                 </button>
                                             </div>
                                         </td>
+                                        )}
                                     </tr>
                                 ))
                             ) : (

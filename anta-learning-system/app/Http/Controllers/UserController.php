@@ -10,6 +10,7 @@ use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Routing\Attributes\Controllers\Middleware;
 use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
@@ -17,6 +18,7 @@ class UserController extends Controller
     /**
      * Lista los colaboradores para el Dashboard web.
      */
+    #[Middleware('permission:listar_colaboradores')]
     public function index(Request $request): Response
     {
         $query = User::with('roles:id,name')
@@ -52,6 +54,7 @@ class UserController extends Controller
     /**
      * Da de alta un nuevo colaborador individualmente.
      */
+    #[Middleware('permission:crear_colaborador')]
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
@@ -59,15 +62,15 @@ class UserController extends Controller
             'dni' => 'required|integer|unique:users,dni',
             'legajo' => 'required|integer|unique:users,legajo',
             'email' => 'required|string|email|max:255|unique:users,email', // Requerido por la BD
-            'rol' => ['required', Rule::in(['Operario', 'Supervisor'])],
+            'rol' => ['nullable', Rule::in(['Operario', 'Supervisor'])],
             'zona_geografica_establecimient' => 'required|string', // Nodo (ej. Las Lajitas)
             'centro_costo' => 'required|string', // Departamento (ej. Cosecha, Empaque)
         ]);
 
+        $validated['rol'] = $validated['rol'] ?? 'Operario';
         $validated['password'] = Hash::make($validated['dni']);
         $validated['estado_operativo'] = 'Activo';
         $validated['fecha_ingreso'] = now();
-        $validated['must_change_password'] = true; 
 
         $user = User::create($validated);
         $user->assignRole($validated['rol']);
@@ -86,6 +89,7 @@ class UserController extends Controller
             ->with('success', 'Colaborador dado de alta exitosamente. Su contraseña inicial es su DNI.');
     }
 
+    #[Middleware('permission:listar_colaboradores')]
     public function show($id): Response
     {
         $colaborador = User::with([
@@ -97,8 +101,9 @@ class UserController extends Controller
             'colaborador' => $colaborador,
         ]);
     }
-
-public function edit($id): Response
+    
+    #[Middleware('permission:editar_colaborador')]
+    public function edit($id): Response
     {
         $colaborador = User::findOrFail($id);
 
@@ -110,7 +115,8 @@ public function edit($id): Response
     /**
      * Actualiza y redirige de vuelta al Show con mensaje de confirmación.
      */
-    public function update(Request $request, $id): RedirectResponse
+    #[Middleware('permission:editar_colaborador')]    
+     public function update(Request $request, $id): RedirectResponse
     {
         $user = User::findOrFail($id);
 
@@ -142,6 +148,7 @@ public function edit($id): Response
             ->with('success', 'Datos del colaborador actualizados correctamente.');
     }
 
+    #[Middleware('permission:suspender_colaborador')]
     public function updateStatus(Request $request, $id): RedirectResponse
     {
         $user = User::findOrFail($id);

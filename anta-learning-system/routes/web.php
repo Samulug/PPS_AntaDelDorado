@@ -1,5 +1,6 @@
 <?php
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\RoleController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\CuadrillaController;
 use App\Http\Controllers\DashboardController;
@@ -39,6 +40,8 @@ Route::middleware(['auth', 'verified', 'dashboard.access'])->group(function () {
     // Rutas para Cuadrillas
     Route::resource('cuadrillas',CuadrillaController::class);
     Route::post('/cuadrillas/borrador', [CuadrillaController::class, 'saveDraft'])->name('cuadrillas.draft');
+    Route::patch('/cuadrillas/{id}/status', [CuadrillaController::class, 'updateStatus'])->name('cuadrillas.status');
+
 
     // Rutas de Cursos
     Route::resource('cursos',CursoController::class);
@@ -46,6 +49,16 @@ Route::middleware(['auth', 'verified', 'dashboard.access'])->group(function () {
     Route::patch('/cursos/{id}/status', [CursoController::class, 'updateStatus'])->name('cursos.status');
     Route::post('/cursos/multimedia/upload', [CursoController::class, 'uploadMultimedia'])
     ->name('cursos.multimedia.upload');
+
+    Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
+    Route::get('/roles/create', [RoleController::class, 'createRole'])->name('roles.create');
+    Route::post('/roles', [RoleController::class, 'storeRole'])->name('roles.store');
+    Route::put('/roles/{role}/permissions', [RoleController::class, 'updateRolePermissions'])->name('roles.permissions.update');
+    Route::delete('/roles/{role}', [RoleController::class, 'destroyRole'])->name('roles.destroy');
+
+    Route::get('/administradores/create', [RoleController::class, 'createAdmin'])->name('roles.admins.create'); 
+    Route::post('/roles/administradores', [RoleController::class, 'storeAdmin'])->name('roles.admins.store');
+    Route::patch('/roles/administradores/{user}', [RoleController::class, 'updateAdmin'])->name('roles.admins.update');
     });
 
 require __DIR__.'/auth.php';

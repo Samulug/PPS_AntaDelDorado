@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
+import { useAuth } from '@/hooks/use-auth';
 import AppLayout from '@/Layouts/app-layout';
 import {
     ArrowLeft,
@@ -64,7 +65,8 @@ export default function ColaboradorShow({ colaborador }: Props) {
         onConfirm: (motivo?: string) => void;
     } | null>(null);
     const [motivoBaja, setMotivoBaja] = useState('Suspendido');
-
+    const { can } = useAuth();
+    
     const handleForcePasswordReset = () => {
         setConfirmModal({
             title: 'Confirmar restablecimiento de contraseña',
@@ -133,6 +135,7 @@ export default function ColaboradorShow({ colaborador }: Props) {
                     </div>
 
                     {/* BOTÓN EDITAR EN CASO DE CARGA ERRÓNEA */}
+                    {can('editar_colaborador') && (
                     <div className="flex items-center gap-2.5 flex-wrap">
                         <Link
                             href={`/colaboradores/${colaborador.id}/edit`}
@@ -187,9 +190,10 @@ export default function ColaboradorShow({ colaborador }: Props) {
                                 Poner activo
                             </button>
                         )}
-                    </div>
+                    </div> 
+                    )}  
                 </div>
-
+                
                 {/* TARJETA 1: DATOS GENERALES DEL LEGAJO */}
                 <div className="bg-white dark:bg-[#1B1F1C] border border-[#E9E9E7] dark:border-[#2A302B] rounded-[16px] p-6 shadow-sm">
                     <h2 className="text-[17px] font-bold text-[#1F2328] dark:text-[#ECEFEC] m-0 mb-4 pb-2 border-b border-[#E9E9E7] dark:border-[#2A302B]">
