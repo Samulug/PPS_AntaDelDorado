@@ -62,7 +62,7 @@ interface CursoWizardData {
     descripcion: string;
     tiempo_vigencia: string;
     estado_curso: 'Activo' | 'Borrador' | 'Inactivo';
-    id_curso_req: number | null;
+    ids_cursos_req: number[];
     modulos: ModuloForm[];
     cuestionario: CuestionarioForm;
     [key: string]: any;
@@ -98,7 +98,7 @@ export default function CreateCurso({ cursosDisponibles = [], repositorioSharepo
         descripcion: '',
         tiempo_vigencia: '',
         estado_curso: 'Activo',
-        id_curso_req: null,
+        ids_cursos_req: [],
         modulos: [
             {
                 titulo: 'Módulo 1: Introducción y Conceptos Clave',
@@ -644,10 +644,10 @@ const triggerToast = (msg: string) => {
                             <div className="flex flex-col gap-3">
                                 <div className="shrink-0">
                                     <h4 className="text-[15px] font-semibold text-[#1F2328] dark:text-[#ECEFEC] m-0">
-                                        Curso requerido para desbloquear este curso (Correlatividad)
+                                        Cursos prerrequisitos para desbloquear este curso (Correlatividad)
                                     </h4>
                                     <p className="text-[13px] text-[#6B7280] m-0">
-                                        Buscá y seleccioná un curso si el colaborador debe completarlo antes de acceder.
+                                        Buscá y seleccioná uno o más cursos si el colaborador debe completarlos antes de acceder.
                                     </p>
                                 </div>
 
@@ -660,50 +660,38 @@ const triggerToast = (msg: string) => {
                                 />
 
                                 <div className="max-h-[190px] overflow-y-auto border border-[#E9E9E7] dark:border-[#2A302B] rounded-[10px] p-3 grid gap-2 content-start">
-                                    <label
-                                        className={`flex items-center gap-3 p-2.5 rounded-[8px] border cursor-pointer text-[14px] ${
-                                            wizardData.id_curso_req === null
-                                                ? 'border-[#2F6F5E] bg-[#EDF4F1] dark:bg-[#223029] font-semibold text-[#2F6F5E]'
-                                                : 'border-[#E9E9E7] dark:border-[#2A302B]'
-                                        }`}
-                                    >
-                                        <input
-                                            type="radio"
-                                            name="curso_req"
-                                            checked={wizardData.id_curso_req === null}
-                                            onChange={() =>
-                                                setWizardData({ ...wizardData, id_curso_req: null })
-                                            }
-                                            className="accent-[#2F6F5E]"
-                                        />
-                                        <span>Sin curso previo requerido (Acceso libre desde el ingreso)</span>
-                                    </label>
-
                                     {filteredRequisitos.length > 0 ? (
-                                        filteredRequisitos.map((req) => (
-                                            <label
-                                                key={req.id_curso}
-                                                className={`flex items-center gap-3 p-2.5 rounded-[8px] border cursor-pointer text-[14px] ${
-                                                    wizardData.id_curso_req === req.id_curso
-                                                        ? 'border-[#2F6F5E] bg-[#EDF4F1] dark:bg-[#223029] font-semibold text-[#2F6F5E]'
-                                                        : 'border-[#E9E9E7] dark:border-[#2A302B]'
-                                                }`}
-                                            >
-                                                <input
-                                                    type="radio"
-                                                    name="curso_req"
-                                                    checked={wizardData.id_curso_req === req.id_curso}
-                                                    onChange={() =>
-                                                        setWizardData({
-                                                            ...wizardData,
-                                                            id_curso_req: req.id_curso,
-                                                        })
-                                                    }
-                                                    className="accent-[#2F6F5E]"
-                                                />
-                                                <span>{req.nombre}</span>
-                                            </label>
-                                        ))
+                                        filteredRequisitos.map((req) => {
+                                            const isChecked = wizardData.ids_cursos_req?.includes(req.id_curso);
+                                            return (
+                                                <label
+                                                    key={req.id_curso}
+                                                    className={`flex items-center gap-3 p-2.5 rounded-[8px] border cursor-pointer text-[14px] ${
+                                                        isChecked
+                                                            ? 'border-[#2F6F5E] bg-[#EDF4F1] dark:bg-[#223029] font-semibold text-[#2F6F5E]'
+                                                            : 'border-[#E9E9E7] dark:border-[#2A302B]'
+                                                    }`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isChecked}
+                                                        onChange={() => {
+                                                            setWizardData((prev) => {
+                                                                const currentReqs = prev.ids_cursos_req || [];
+                                                                return {
+                                                                    ...prev,
+                                                                    ids_cursos_req: isChecked
+                                                                        ? currentReqs.filter((id) => id !== req.id_curso)
+                                                                        : [...currentReqs, req.id_curso],
+                                                                };
+                                                            });
+                                                        }}
+                                                        className="accent-[#2F6F5E] w-4.5 h-4.5"
+                                                    />
+                                                    <span>{req.nombre}</span>
+                                                </label>
+                                            );
+                                        })
                                     ) : (
                                         <div className="py-4 text-center text-[13px] text-[#6B7280]">
                                             No se encontraron cursos con ese nombre.

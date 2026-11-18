@@ -59,7 +59,7 @@ class CuadrillaController extends Controller
         ])->findOrFail($id);
 
         return Inertia::render('cuadrillas/show',[
-            'cuadrilla = $cuadrilla',
+            'cuadrilla' => $cuadrilla,
         ]);
     }
 

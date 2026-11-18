@@ -118,6 +118,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'zona_geografica_establecimient' => 'Las Lajitas',
                 'centro_costo'                   => 'Sistemas',
                 'estado_operativo'               => 'Activo',
+                'disponible_soporte'             => false,
                 'fecha_ingreso'                  => now(),
             ]
         );
@@ -134,6 +135,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'zona_geografica_establecimient' => 'Las Lajitas',
                 'centro_costo'                   => 'Recursos Humanos',
                 'estado_operativo'               => 'Activo',
+                'disponible_soporte'             => false,
                 'fecha_ingreso'                  => now(),
             ]
         );

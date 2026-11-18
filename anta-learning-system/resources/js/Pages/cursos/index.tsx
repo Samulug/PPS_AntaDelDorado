@@ -25,10 +25,11 @@ interface CursoItem {
     tiempo_vigencia: string;
     estado_curso: 'Activo' | 'Borrador' | 'Inactivo' | string;
     id_curso_req?: number | null;
-    curso_requisito?: {
+    ids_cursos_req?: number[] | null;
+    cursos_requeridos?: {
         id_curso: number;
         nombre: string;
-    } | null;
+    }[] | null;
     modulos_count?: number;
     created_at: string;
 }
@@ -113,7 +114,7 @@ export default function CursosIndex({ cursos = [] }: Props) {
         const q = appliedFilters.search.toLowerCase().trim();
 
         const filtered = cursos.filter((c) => {
-            const reqName = c.curso_requisito?.nombre || '';
+            const reqName = (c.cursos_requeridos && c.cursos_requeridos.length > 0) ? c.cursos_requeridos.map((req: any) => req.nombre).join(' • ') : '';
             const matchText =
                 !q ||
                 `${c.nombre} ${c.descripcion || ''} ${reqName} ${c.estado_curso}`
@@ -386,12 +387,14 @@ export default function CursosIndex({ cursos = [] }: Props) {
                                             <b className="font-semibold text-[#1F2328] dark:text-[#ECEFEC] block truncate">
                                                 {curso.nombre}
                                             </b>
-                                            <span className="text-[12px] text-[#6B7280] dark:text-[#9AA39D] block truncate">
-                                                {curso.modulos_count ?? 0} mód. · Req:{' '}
-                                                {curso.curso_requisito
-                                                    ? curso.curso_requisito.nombre
-                                                    : 'Ninguno (Libre)'}
-                                            </span>
+                                            <div className="max-w-[200px] sm:max-w-[280px]">
+                                                <span className="text-[12px] text-[#6B7280] dark:text-[#9AA39D] block truncate" title={curso.cursos_requeridos && curso.cursos_requeridos.length > 0 ? curso.cursos_requeridos.map((req) => req.nombre).join(' • ') : 'Ninguno (Libre)'}>
+                                                    {curso.modulos_count ?? 0} mód. · Req:{' '}
+                                                    {curso.cursos_requeridos && curso.cursos_requeridos.length > 0
+                                                        ? curso.cursos_requeridos.map((req) => req.nombre).join(' • ')
+                                                        : 'Ninguno (Libre)'}
+                                                </span>
+                                            </div>
                                         </td>
 
                                         {/* Columna 2: Fecha de Creación */}

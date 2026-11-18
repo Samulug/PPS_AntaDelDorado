@@ -35,7 +35,7 @@ return new class extends Migration
             $table->text('descripcion');
             $table->date('tiempo_vigencia');
             $table->string('estado_curso', 50)->default('Activo'); // Activo, En_Taller_Revision, Inactivo
-            $table->foreignId('id_curso_req')->nullable()->constrained('curso', 'id_curso')->nullOnDelete();
+            $table->json('ids_cursos_req')->nullable();
             $table->integer('version_trimestral')->default(1);
             $table->timestamps();
         });
@@ -132,11 +132,22 @@ return new class extends Migration
             $table->id('id_ticket');
             $table->foreignId('id_usuario')->constrained('users', 'id')->cascadeOnDelete();
             $table->foreignId('id_curso')->nullable()->constrained('curso', 'id_curso')->nullOnDelete();
-            $table->foreignId('id_admin_respondiente')->nullable()->constrained('users', 'id')->nullOnDelete();
-            $table->text('mensaje_consulta');
-            $table->text('respuesta_admin')->nullable();
-            $table->string('estado_ticket', 50)->default('Pendiente'); // Pendiente, Respondido
-            $table->integer('calificacion_resuesta')->nullable(); // 1 a 5 estrellas
+            $table->foreignId('id_admin_asignado')->nullable()->constrained('users', 'id')->nullOnDelete();
+            $table->string('categoria_consulta');
+            $table->string('asunto_resumen');
+            $table->timestamp('fecha_devolucion_cola')->nullable();
+            $table->boolean('alerta_demora_enviada')->default(false);
+            $table->string('estado_ticket', 50)->default('Abierto'); //Abierto, Pendiente, Respondido
+            $table->integer('calificacion_respuesta')->nullable(); // 1 a 5 estrellas
+            $table->timestamps();
+        });
+
+        // 12,5. Tabla: mensaje_ticket
+        Schema::create('mensaje_ticket', function(Blueprint $table){
+            $table->id('id_mensaje');
+            $table->foreignId('id_ticket')->constrained('ticket_consulta', 'id_ticket')->cascadeOnDelete();            $table->foreignId('id_emisor_usuario')->constrained('users','id')->cascadeOnDelete();
+            $table->text('cuerpo_mensaje');
+            $table->boolean('es_nota_interna')->default(false);
             $table->timestamps();
         });
 

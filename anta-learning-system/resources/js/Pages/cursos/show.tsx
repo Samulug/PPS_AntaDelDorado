@@ -166,13 +166,19 @@ export default function CursoShow({ curso }: any) {
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-[14px]">
                         <div className="p-3.5 rounded-[10px] bg-[#F7F7F6] dark:bg-[#141714]">
                             <span className="text-[12px] text-[#6B7280] block">
-                                Curso requisito previo:
+                                Cursos requisitos previos:
                             </span>
-                            <b className="text-[#1F2328] dark:text-[#ECEFEC]">
-                                {curso.curso_requisito
-                                    ? curso.curso_requisito.nombre
-                                    : 'Ninguno (Desbloqueado)'}
-                            </b>
+                            <div className="text-[#1F2328] dark:text-[#ECEFEC] mt-1 grid gap-1">
+                                {curso.cursos_requeridos && curso.cursos_requeridos.length > 0 ? (
+                                    curso.cursos_requeridos.map((req: any) => (
+                                        <b key={req.id_curso} className="block text-[14px]">
+                                            • {req.nombre}
+                                        </b>
+                                    ))
+                                ) : (
+                                    <b className="text-[14px]">Ninguno (Desbloqueado)</b>
+                                )}
+                            </div>
                         </div>
 
                         <div className="p-3.5 rounded-[10px] bg-[#F7F7F6] dark:bg-[#141714]">

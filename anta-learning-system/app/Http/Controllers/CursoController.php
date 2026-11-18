@@ -28,9 +28,7 @@ class CursoController extends Controller
     #[Middleware('permission:listar_cursos')]
     public function index(): Response
     {
-        $cursos = Curso::with([
-            'cursoRequisito:id_curso,nombre',
-        ])
+        $cursos = Curso::with([])
         ->withCount('modulos')
         ->orderByDesc('updated_at')
         ->get();
@@ -67,7 +65,8 @@ class CursoController extends Controller
             'nombre'          => 'required|string|max:255',
             'descripcion'     => 'nullable|string',
             'tiempo_vigencia' => 'nullable|date',
-            'id_curso_req'    => 'nullable|exists:curso,id_curso',
+            'ids_cursos_req'  => 'nullable|array', 
+            'ids_cursos_req.*'=> 'exists:curso,id_curso',
             'modulos'         => 'nullable|array',
             'cuestionario'    => 'nullable|array',
         ]);
@@ -80,8 +79,7 @@ class CursoController extends Controller
                     'descripcion'     => $validated['descripcion'] ?? 'Borrador en progreso',
                     'tiempo_vigencia' => $validated['tiempo_vigencia'] ?? now()->addYear()->toDateString(),
                     'estado_curso'    => 'Borrador',
-                    'id_curso_req'    => $validated['id_curso_req'] ?? null,
-                ]);
+                    'ids_cursos_req' => $validated['ids_cursos_req'] ?? [],                ]);
             } else {
                 $curso = Curso::updateOrCreate(
                     [
@@ -91,7 +89,7 @@ class CursoController extends Controller
                     [
                         'descripcion'        => $validated['descripcion'] ?? 'Borrador en progreso',
                         'tiempo_vigencia'    => $validated['tiempo_vigencia'] ?? now()->addYear()->toDateString(),
-                        'id_curso_req'       => $validated['id_curso_req'] ?? null,
+                        'ids_cursos_req' => $validated['ids_cursos_req'] ?? [],
                         'version_trimestral' => 1,
                     ]
                 );
@@ -119,7 +117,8 @@ class CursoController extends Controller
             'descripcion'     => 'nullable|string',
             'tiempo_vigencia' => 'required|date',
             'estado_curso'    => 'required|in:Activo,Borrador,Inactivo',
-            'id_curso_req'    => 'nullable|exists:curso,id_curso',
+            'ids_cursos_req'  => 'nullable|array', 
+            'ids_cursos_req.*'=> 'exists:curso,id_curso',
             'modulos'         => 'required|array|min:1',
             'cuestionario'    => 'required|array',
         ]);
@@ -132,7 +131,7 @@ class CursoController extends Controller
                     'descripcion'     => $validated['descripcion'] ?? '',
                     'tiempo_vigencia' => $validated['tiempo_vigencia'],
                     'estado_curso'    => $validated['estado_curso'],
-                    'id_curso_req'    => $validated['id_curso_req'] ?? null,
+                    'ids_cursos_req' => $validated['ids_cursos_req'] ?? [],
                 ]);
             } else {
                 $curso = Curso::create([
@@ -140,7 +139,7 @@ class CursoController extends Controller
                     'descripcion'        => $validated['descripcion'] ?? '',
                     'tiempo_vigencia'    => $validated['tiempo_vigencia'],
                     'estado_curso'       => $validated['estado_curso'],
-                    'id_curso_req'       => $validated['id_curso_req'] ?? null,
+                    'ids_cursos_req' => $validated['ids_cursos_req'] ?? [],                    
                     'version_trimestral' => 1,
                 ]);
             }
@@ -172,7 +171,6 @@ class CursoController extends Controller
     public function show($id): Response
     {
         $curso = Curso::with([
-            'cursoRequisito:id_curso,nombre',
             'modulos.lecciones.cuestionario.preguntas.opciones',
         ])->findOrFail($id);
 
@@ -214,7 +212,8 @@ class CursoController extends Controller
             'descripcion'     => 'nullable|string',
             'tiempo_vigencia' => 'required|date',
             'estado_curso'    => 'required|in:Activo,Borrador,Inactivo',
-            'id_curso_req'    => 'nullable|exists:curso,id_curso',
+            'ids_cursos_req'  => 'nullable|array', 
+            'ids_cursos_req.*'=> 'exists:curso,id_curso',
             'modulos'         => 'required|array|min:1',
             'cuestionario'    => 'required|array',
         ]);
@@ -225,7 +224,7 @@ class CursoController extends Controller
                 'descripcion'        => $validated['descripcion'] ?? '',
                 'tiempo_vigencia'    => $validated['tiempo_vigencia'],
                 'estado_curso'       => $validated['estado_curso'],
-                'id_curso_req'       => $validated['id_curso_req'] ?? null,
+                'ids_cursos_req' => $validated['ids_cursos_req'] ?? [],
                 'version_trimestral' => ($curso->version_trimestral ?? 1) + 1,
             ]);
 

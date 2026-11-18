@@ -15,6 +15,7 @@ use App\Models\Pregunta;
 use App\Models\ProgresoCurso;
 use App\Models\RespuestaUsuario;
 use App\Models\TicketConsulta;
+use App\Models\MensajeTicket;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -76,6 +77,7 @@ class DatabaseSeeder extends Seeder
             'centro_costo' => 'CC-ADM-01',
             'zona_geografica_establecimient' => 'Las Lajitas',
             'estado_operativo' => 'Activo',
+            'disponible_soporte' => true,
             'fecha_ingreso' => '2020-03-01',
         ]);
         $belec->assignRole($roleSuperAdmin);
@@ -92,6 +94,7 @@ class DatabaseSeeder extends Seeder
             'centro_costo' => 'CC-HYS-01',
             'zona_geografica_establecimient' => 'Las Lajitas',
             'estado_operativo' => 'Activo',
+            'disponible_soporte' => false,
             'fecha_ingreso' => '2021-06-15',
         ]);
         $viol->assignRole($roleHyS);
@@ -108,6 +111,7 @@ class DatabaseSeeder extends Seeder
             'centro_costo' => 'CC-ADM-01',
             'zona_geografica_establecimient' => 'Las Lajitas',
             'estado_operativo' => 'Activo',
+            'disponible_soporte' => true,
             'fecha_ingreso' => '2022-02-10',
         ]);
         $licRrhh->assignRole($roleRRHH);
@@ -221,7 +225,7 @@ class DatabaseSeeder extends Seeder
             'descripcion' => 'Capacitación inicial obligatoria para aprender a navegar la plataforma, usar el dictado por voz y configurar el modo de alto contraste en campo.',
             'tiempo_vigencia' => now()->addYear()->toDateString(),
             'estado_curso' => 'Activo',
-            'id_curso_req' => null,
+            'ids_cursos_req' => [], 
             'version_trimestral' => 1,
         ]);
 
@@ -283,7 +287,7 @@ class DatabaseSeeder extends Seeder
             'descripcion' => 'Protocolos de prevención de accidentes, inspección previa y uso obligatorio de Elementos de Protección Personal en planta.',
             'tiempo_vigencia' => now()->addMonths(6)->toDateString(),
             'estado_curso' => 'Activo',
-            'id_curso_req' => $cursoApp->id_curso,
+            'ids_cursos_req' => [$cursoApp->id_curso],
             'version_trimestral' => 1,
         ]);
 
@@ -347,7 +351,7 @@ class DatabaseSeeder extends Seeder
             'descripcion' => 'Capacitación avanzada para operarios habilitados. Requiere haber aprobado Seguridad en Maquinaria Agrícola.',
             'tiempo_vigencia' => now()->addMonths(6)->toDateString(),
             'estado_curso' => 'Activo',
-            'id_curso_req' => $cursoMaquinaria->id_curso,
+            'ids_cursos_req' => [$cursoMaquinaria->id_curso], 
             'version_trimestral' => 1,
         ]);
 
@@ -432,25 +436,44 @@ class DatabaseSeeder extends Seeder
             }
         }
 
-        // 10. Poblar Bandeja de Tickets Anónimos (Auditados internamente)
-        TicketConsulta::create([
-            'id_usuario' => $colaboradoresPiloto[1]->id, // Juan Carlos Mamani
+// 10. Poblar Bandeja de Tickets (Nuevo Sistema de Chat)
+        // Ticket 1: Resuelto (Chat completo)
+        $ticket1 = TicketConsulta::create([
+            'id_usuario' => $colaboradoresPiloto[1]->id, 
             'id_curso' => $cursoMaquinaria->id_curso,
-            'id_admin_respondiente' => $licRrhh->id, // Respondió Carolina Gómez (el operario lee "Recursos Humanos")
-            'mensaje_consulta' => 'Hola, dictado por voz: mis gafas de protección están rayadas antes de empezar la poda en el lote norte, ¿dónde retiro unas nuevas?',
-            'respuesta_admin' => 'Hola Juan Carlos. Puedes retirar un par de gafas nuevas hoy mismo en el pañol de Planta Las Lajitas presentando tu número de legajo. Saludos, Recursos Humanos.',
-            'estado_ticket' => 'Respondido',
-            'calificacion_resuesta' => 5,
+            'id_admin_asignado' => $licRrhh->id,
+            'categoria_consulta' => 'Higiene y Seguridad',
+            'asunto_resumen' => 'Gafas rayadas lote norte',
+            'estado_ticket' => 'Resuelto',
+            'calificacion_respuesta' => 5,
         ]);
 
-        TicketConsulta::create([
-            'id_usuario' => $colaboradoresPiloto[4]->id, // Luis Alberto Salvatierra (el que tiene el curso bloqueado)
+        MensajeTicket::create([
+            'id_ticket' => $ticket1->id_ticket,
+            'id_emisor_usuario' => $colaboradoresPiloto[1]->id,
+            'cuerpo_mensaje' => 'Hola, mis gafas de protección están rayadas antes de empezar la poda en el lote norte.',
+        ]);
+
+        MensajeTicket::create([
+            'id_ticket' => $ticket1->id_ticket,
+            'id_emisor_usuario' => $licRrhh->id,
+            'cuerpo_mensaje' => 'Hola Juan Carlos. Puedes retirar un par nuevo hoy en el pañol.',
+        ]);
+
+        // Ticket 2: Nuevo en Bandeja (Nadie lo ha tomado aún)
+        $ticket2 = TicketConsulta::create([
+            'id_usuario' => $colaboradoresPiloto[4]->id,
             'id_curso' => $cursoMaquinaria->id_curso,
-            'id_admin_respondiente' => null,
-            'mensaje_consulta' => 'Se me bloqueó el cuestionario de Maquinaria después del tercer intento, necesito que me lo habiliten por favor.',
-            'respuesta_admin' => null,
-            'estado_ticket' => 'Pendiente',
-            'calificacion_resuesta' => null,
+            'id_admin_asignado' => null, // Huérfano en bandeja general
+            'categoria_consulta' => 'Sistema / Cursos',
+            'asunto_resumen' => 'Bloqueo en cuestionario',
+            'estado_ticket' => 'Abierto',
+        ]);
+
+        MensajeTicket::create([
+            'id_ticket' => $ticket2->id_ticket,
+            'id_emisor_usuario' => $colaboradoresPiloto[4]->id,
+            'cuerpo_mensaje' => 'Se me bloqueó el cuestionario después del tercer intento, ¿me lo habilitan?',
         ]);
 
         // 11. Poblar Historial de Notificaciones Duales (Push + Correo)

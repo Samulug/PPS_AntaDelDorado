@@ -67,8 +67,8 @@ class ProfileController extends Controller
 
         $totalTicketsRespondidos = (clone $ticketsRespondidosQuery)->count();
         $calificacionPromedio = (clone $ticketsRespondidosQuery)
-            ->whereNotNull('calificacion_resuesta')
-            ->avg('calificacion_resuesta');
+            ->whereNotNull('calificacion_respuesta')
+            ->avg('calificacion_respuesta');
 
         $ultimosTickets = TicketConsulta::with([
             'colaborador:id,nombre_completo,legajo,zona_geografica_establecimient',

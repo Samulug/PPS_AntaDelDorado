@@ -226,7 +226,7 @@ export default function CuadrillaShow({ cuadrilla }: { cuadrilla: Cuadrilla }) {
                         Datos operativos
                     </h2>
                     
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 text-[14px]">
+                    <div className="grid sm:grid-cols-3 gap-5 text-[14px]">
                         <div className="sm:col-span-3">
                             <span className="text-[#6B7280] dark:text-[#9AA39D] block text-[13px] mb-1">Labor / Tarea de Riesgo:</span>
                             <b className="text-[#1F2328] dark:text-[#ECEFEC] font-medium">{cuadrilla.labor_asociada || 'No definida'}</b>

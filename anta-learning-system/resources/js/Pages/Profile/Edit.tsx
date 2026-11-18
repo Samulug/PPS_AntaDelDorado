@@ -62,7 +62,7 @@ interface TicketAuditado {
     mensaje_consulta: string;
     respuesta_admin: string;
     estado_ticket: string;
-    calificacion_resuesta: number | null;
+    calificacion_respuesta: number | null;
     updated_at: string;
     colaborador?: {
         id: number;
@@ -652,7 +652,7 @@ export default function ProfileEdit({
                                                         {t.respuesta_admin || '—'}
                                                     </td>
                                                     <td className="py-3 px-4 text-right font-semibold whitespace-nowrap">
-                                                        {t.calificacion_resuesta ? `${t.calificacion_resuesta} ★` : 'Pendiente'}
+                                                        {t.calificacion_respuesta ? `${t.calificacion_respuesta} ★` : 'Pendiente'}
                                                     </td>
                                                 </tr>
                                             ))

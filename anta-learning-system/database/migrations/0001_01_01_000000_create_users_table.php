@@ -26,6 +26,7 @@ return new class extends Migration
             $table->date('fecha_ingreso')->default(now());
             $table->string('fcm_token')->nullable();
             $table->string('foto')->nullable(); // Para avatar con Storage::disk('public')
+            $table->boolean('disponible_soporte')->default(false);
             $table->rememberToken();
             $table->timestamps();
         });

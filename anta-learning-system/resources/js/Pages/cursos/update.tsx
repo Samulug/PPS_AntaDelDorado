@@ -110,7 +110,7 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
             | 'Activo'
             | 'Borrador'
             | 'Inactivo',
-        id_curso_req: cursoEditable.id_curso_req ?? null,
+        ids_cursos_req: cursoEditable?.ids_cursos_req || [],
         modulos: initialModulos,
         cuestionario: initialCuestionario,
     });
@@ -494,41 +494,44 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
                                     className="h-[38px] px-3.5 py-1.5 rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-[#F7F7F6] dark:bg-[#141714] text-[#1F2328] dark:text-[#ECEFEC] text-[14px] outline-none focus:border-[#2F6F5E]"
                                 />
 
-                                <div className="max-h-[190px] overflow-y-auto border border-[#E9E9E7] dark:border-[#2A302B] rounded-[10px] p-3 grid gap-2">
-                                    <label
-                                        className={`flex items-center gap-3 p-2.5 rounded-[8px] border cursor-pointer text-[14px] ${
-                                            wizardData.id_curso_req === null
-                                                ? 'border-[#2F6F5E] bg-[#EDF4F1] dark:bg-[#223029] font-semibold text-[#2F6F5E] dark:text-[#6FBFA5]'
-                                                : 'border-[#E9E9E7] dark:border-[#2A302B] text-[#1F2328] dark:text-[#ECEFEC]'
-                                        }`}
-                                    >
-                                        <input
-                                            type="radio"
-                                            checked={wizardData.id_curso_req === null}
-                                            onChange={() => setWizardData({ ...wizardData, id_curso_req: null })}
-                                            className="accent-[#2F6F5E]"
-                                        />
-                                        <span>Sin curso previo requerido</span>
-                                    </label>
-
-                                    {filteredRequisitos.map((req: any) => (
-                                        <label
-                                            key={req.id_curso}
-                                            className={`flex items-center gap-3 p-2.5 rounded-[8px] border cursor-pointer text-[14px] ${
-                                                wizardData.id_curso_req === req.id_curso
-                                                    ? 'border-[#2F6F5E] bg-[#EDF4F1] dark:bg-[#223029] font-semibold text-[#2F6F5E] dark:text-[#6FBFA5]'
-                                                    : 'border-[#E9E9E7] dark:border-[#2A302B] text-[#1F2328] dark:text-[#ECEFEC]'
-                                            }`}
-                                        >
-                                            <input
-                                                type="radio"
-                                                checked={wizardData.id_curso_req === req.id_curso}
-                                                onChange={() => setWizardData({ ...wizardData, id_curso_req: req.id_curso })}
-                                                className="accent-[#2F6F5E]"
-                                            />
-                                            <span>{req.nombre}</span>
-                                        </label>
-                                    ))}
+                               <div className="max-h-[190px] overflow-y-auto border border-[#E9E9E7] dark:border-[#2A302B] rounded-[10px] p-3 grid gap-2 content-start">
+                                    {filteredRequisitos.length > 0 ? (
+                                        filteredRequisitos.map((req: any) => {
+                                            const isChecked = wizardData.ids_cursos_req?.includes(req.id_curso);
+                                            return (
+                                                <label
+                                                    key={req.id_curso}
+                                                    className={`flex items-center gap-3 p-2.5 rounded-[8px] border cursor-pointer text-[14px] ${
+                                                        isChecked
+                                                            ? 'border-[#2F6F5E] bg-[#EDF4F1] dark:bg-[#223029] font-semibold text-[#2F6F5E] dark:text-[#6FBFA5]'
+                                                            : 'border-[#E9E9E7] dark:border-[#2A302B] text-[#1F2328] dark:text-[#ECEFEC]'
+                                                    }`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isChecked}
+                                                        onChange={() => {
+                                                            setWizardData((prev: any) => {
+                                                                const currentReqs: number[] = prev.ids_cursos_req || [];
+                                                                return {
+                                                                    ...prev,
+                                                                    ids_cursos_req: isChecked
+                                                                        ? currentReqs.filter((id: number) => id !== req.id_curso)
+                                                                        : [...currentReqs, req.id_curso],
+                                                                };
+                                                            });
+                                                        }}
+                                                        className="accent-[#2F6F5E] w-4 h-4"
+                                                    />
+                                                    <span>{req.nombre}</span>
+                                                </label>
+                                            );
+                                        })
+                                    ) : (
+                                        <div className="py-4 text-center text-[13px] text-[#6B7280]">
+                                            No se encontraron cursos previos con ese nombre.
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

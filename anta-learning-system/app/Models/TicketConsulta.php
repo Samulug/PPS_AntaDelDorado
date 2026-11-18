@@ -17,7 +17,7 @@ class TicketConsulta extends Model
         'mensaje_consulta',
         'respuesta_admin',
         'estado_ticket',
-        'calificacion_resuesta',
+        'calificacion_respuesta',
     ];
 
     public function colaborador()

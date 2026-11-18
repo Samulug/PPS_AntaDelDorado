@@ -14,23 +14,25 @@ class Curso extends Model
         'descripcion',
         'tiempo_vigencia',
         'estado_curso',
-        'id_curso_req',
+        'ids_cursos_req',
         'version_trimestral',
     ];
 
     protected $casts = [
         'tiempo_vigencia' => 'date',
+        'ids_cursos_req' => 'array',
     ];
 
-    // Relación auto-referencial (Correlatividad)
-    public function cursoRequisito()
-    {
-        return $this->belongsTo(Curso::class, 'id_curso_req', 'id_curso');
-    }
+    
+    protected $appends = ['cursos_requeridos']; 
 
-    public function cursosDependientes()
+    public function getCursosRequeridosAttribute()
     {
-        return $this->hasMany(Curso::class, 'id_curso_req', 'id_curso');
+        if (empty($this->ids_cursos_req)) {
+            return [];
+        }
+        // Busca los cursos cuyos IDs estén dentro del arreglo JSON
+        return self::whereIn('id_curso', $this->ids_cursos_req)->get(['id_curso', 'nombre']);
     }
 
     public function modulos()
