@@ -22,6 +22,14 @@ use App\Mail\CursoEstadoActualizadoMail;
 
 class CursoController extends Controller
 {
+    private const ARCHIVOS_EJEMPLO_PROHIBIDOS = [
+        'Capacitacion_Inicial.pptx',
+        'Video_Seguridad.mp4',
+        'Diapositivas_EPP.pptx',
+        'Diapositivas.pptx',
+        'Archivo_Adjunto.pptx',
+        'sp-item-prototipo',
+    ];
     /**
      * Listado principal de cursos para la tabla rápida.
      */
@@ -64,7 +72,7 @@ class CursoController extends Controller
             'id_curso'        => 'nullable|exists:curso,id_curso',
             'nombre'          => 'required|string|max:255',
             'descripcion'     => 'nullable|string',
-            'tiempo_vigencia' => 'nullable|date',
+            'tiempo_vigencia' => 'nullable|date|after:today',
             'ids_cursos_req'  => 'nullable|array', 
             'ids_cursos_req.*'=> 'exists:curso,id_curso',
             'modulos'         => 'nullable|array',
@@ -111,16 +119,36 @@ class CursoController extends Controller
     #[Middleware('permission:crear_curso')]
     public function store(Request $request): RedirectResponse
     {
+    $esBorrador = $request->input('estado_curso') === 'Borrador';
+
         $validated = $request->validate([
             'id_curso'        => 'nullable|exists:curso,id_curso',
             'nombre'          => 'required|string|max:255',
             'descripcion'     => 'nullable|string',
-            'tiempo_vigencia' => 'required|date',
+            'tiempo_vigencia' => 'required|date|after:today',
             'estado_curso'    => 'required|in:Activo,Borrador,Inactivo',
-            'ids_cursos_req'  => 'nullable|array', 
+            'ids_cursos_req'  => 'nullable|array',
             'ids_cursos_req.*'=> 'exists:curso,id_curso',
             'modulos'         => 'required|array|min:1',
+            'modulos.*.titulo'      => $esBorrador ? 'nullable|string|max:255' : 'required|string|max:255',
+            'modulos.*.descripcion' => $esBorrador ? 'nullable|string' : 'required|string|min:5',
+            'modulos.*.contenidos'  => $esBorrador ? 'nullable|array' : 'required|array|min:1',
+            'modulos.*.contenidos.*.titulo' => $esBorrador ? 'nullable|string|max:255' : 'required|string|max:255',
+            'modulos.*.contenidos.*.tipo_recurso' => 'required_with:modulos.*.contenidos|in:Video,Presentacion_Filminas',
+            'modulos.*.contenidos.*.archivo_nombre' => [
+                $esBorrador ? 'nullable' : 'required',
+                'string',
+                function ($attribute, $value, $fail) use ($esBorrador) {
+                    if (!$esBorrador && in_array(trim((string) $value), self::ARCHIVOS_EJEMPLO_PROHIBIDOS, true)) {
+                        $fail('Debés subir un archivo real; no se permiten archivos de ejemplo.');
+                    }
+                },
+            ],
             'cuestionario'    => 'required|array',
+        ], [
+            'modulos.*.descripcion.required' => 'Cada módulo debe incluir una descripción.',
+            'modulos.*.contenidos.required'  => 'Los módulos no pueden estar vacíos; adjuntá al menos un Video o PowerPoint.',
+            'modulos.*.contenidos.*.archivo_nombre.required' => 'Cada contenido debe tener un archivo subido.',
         ]);
 
         $curso = DB::transaction(function () use ($validated) {
@@ -207,15 +235,36 @@ class CursoController extends Controller
     {
         $curso = Curso::findOrFail($id);
 
+        $esBorrador = $request->input('estado_curso') === 'Borrador';
+
         $validated = $request->validate([
+            'id_curso'        => 'nullable|exists:curso,id_curso',
             'nombre'          => 'required|string|max:255',
             'descripcion'     => 'nullable|string',
-            'tiempo_vigencia' => 'required|date',
+            'tiempo_vigencia' => 'required|date|after:today',
             'estado_curso'    => 'required|in:Activo,Borrador,Inactivo',
-            'ids_cursos_req'  => 'nullable|array', 
+            'ids_cursos_req'  => 'nullable|array',
             'ids_cursos_req.*'=> 'exists:curso,id_curso',
             'modulos'         => 'required|array|min:1',
+            'modulos.*.titulo'      => $esBorrador ? 'nullable|string|max:255' : 'required|string|max:255',
+            'modulos.*.descripcion' => $esBorrador ? 'nullable|string' : 'required|string|min:5',
+            'modulos.*.contenidos'  => $esBorrador ? 'nullable|array' : 'required|array|min:1',
+            'modulos.*.contenidos.*.titulo' => $esBorrador ? 'nullable|string|max:255' : 'required|string|max:255',
+            'modulos.*.contenidos.*.tipo_recurso' => 'required_with:modulos.*.contenidos|in:Video,Presentacion_Filminas',
+            'modulos.*.contenidos.*.archivo_nombre' => [
+                $esBorrador ? 'nullable' : 'required',
+                'string',
+                function ($attribute, $value, $fail) use ($esBorrador) {
+                    if (!$esBorrador && in_array(trim((string) $value), self::ARCHIVOS_EJEMPLO_PROHIBIDOS, true)) {
+                        $fail('Debés subir un archivo real; no se permiten archivos de ejemplo.');
+                    }
+                },
+            ],
             'cuestionario'    => 'required|array',
+        ], [
+            'modulos.*.descripcion.required' => 'Cada módulo debe incluir una descripción.',
+            'modulos.*.contenidos.required'  => 'Los módulos no pueden estar vacíos; adjuntá al menos un Video o PowerPoint.',
+            'modulos.*.contenidos.*.archivo_nombre.required' => 'Cada contenido debe tener un archivo subido.',
         ]);
 
         DB::transaction(function () use ($curso, $validated, $request) {
@@ -267,10 +316,7 @@ class CursoController extends Controller
             ->with('success', 'Curso actualizado correctamente.');
     }
 
-    /**
-     * Cambio rápido de estado (Activo, Borrador, Inactivo) desde la tabla o desde el Show.
-     */
-    #[Middleware('permission:editar_curso')]
+
     /**
      * Cambio rápido de estado (Activo, Borrador, Inactivo) desde la tabla o desde el Show.
      */
@@ -357,6 +403,7 @@ class CursoController extends Controller
             $modulo = Modulo::create([
                 'id_curso'       => $curso->id_curso,
                 'titulo'         => $tituloMod,
+                'descripcion'    => trim($modInput['descripcion'] ?? '') ?: null,
                 'dia_liberacion' => $modInput['dia_liberacion'] ?? ($idx + 1),
                 'orden'          => $idx + 1,
             ]);
@@ -366,13 +413,14 @@ class CursoController extends Controller
             $contenidos = $modInput['contenidos'] ?? [];
             foreach ($contenidos as $cIdx => $cont) {
                 $tituloCont = trim($cont['titulo'] ?? '');
+                $archivo = trim($cont['archivo_nombre'] ?? '');
                 if (!$tituloCont) continue;
 
                 Leccion::create([
                     'id_modulo'          => $modulo->id_modulo,
                     'titulo'             => $tituloCont,
-                    'tipo_recurso'       => $cont['tipo_recurso'] ?? 'Video', // 'Video' o 'Presentacion_Filminas' (PowerPoint)
-                    'id_sharepoint_item' => $cont['archivo_nombre'] ?? 'sp-item-prototipo',
+                    'tipo_recurso'       => $cont['tipo_recurso'] ?? 'Video',
+                    'id_sharepoint_item' => $archivo,
                     'orden'              => $cIdx + 1,
                 ]);
             }

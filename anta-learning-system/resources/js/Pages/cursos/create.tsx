@@ -34,6 +34,7 @@ interface ContenidoItem {
 
 interface ModuloForm {
     titulo: string;
+    descripcion: string,
     dia_liberacion: number;
     contenidos: ContenidoItem[];
 }
@@ -102,14 +103,9 @@ export default function CreateCurso({ cursosDisponibles = [], repositorioSharepo
         modulos: [
             {
                 titulo: 'Módulo 1: Introducción y Conceptos Clave',
+                descripcion:'',
                 dia_liberacion: 1,
-                contenidos: [
-                    {
-                        titulo: 'Presentación Inicial del Módulo',
-                        tipo_recurso: 'Presentacion_Filminas',
-                        archivo_nombre: 'Capacitacion_Inicial.pptx',
-                    },
-                ],
+                contenidos: [],
             },
         ],
         cuestionario: {
@@ -148,14 +144,7 @@ const triggerToast = (msg: string) => {
         const payload = customData ?? wizardData;
 
         // Evitamos crear un borrador si el usuario abrió la pantalla y salió sin escribir nada ni subir archivos
-        const tieneContenidoSubido = payload.modulos.some((m) =>
-            m.contenidos.some(
-                (c) =>
-                    c.archivo_nombre !== 'Capacitacion_Inicial.pptx' &&
-                    c.archivo_nombre !== 'Video_Seguridad.mp4' &&
-                    c.archivo_nombre !== 'Diapositivas_EPP.pptx'
-            )
-        );
+        const tieneContenidoSubido = payload.modulos.some((m) => m.contenidos.some((c) => Boolean(c.archivo_nombre.trim())));
 
         if (!payload.nombre.trim() && !tieneContenidoSubido && !payload.id_curso) {
             return null;
@@ -242,9 +231,47 @@ const triggerToast = (msg: string) => {
         }
     };
 
+    const mananaISO = useMemo(() => {
+        const d = new Date();
+        d.setDate(d.getDate() + 1);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }, []);
+
     // =========================================================================
     // MANEJADORES DE MÓDULOS Y ADJUNTOS (SECCIÓN 2)
     // =========================================================================
+    const ARCHIVOS_PROHIBIDOS = [
+        'Capacitacion_Inicial.pptx',
+        'Video_Seguridad.mp4',
+        'Diapositivas_EPP.pptx',
+        'Diapositivas.pptx',
+        'Archivo_Adjunto.pptx',
+        'sp-item-prototipo',
+    ];
+
+    const validarModulos = (): string | null => {
+        for (let i = 0; i < wizardData.modulos.length; i++) {
+            const m = wizardData.modulos[i];
+            if (!m.titulo.trim()) return `El Módulo ${i + 1} debe tener un título.`;
+            if (!m.descripcion?.trim() || m.descripcion.trim().length < 5) {
+                return `El Módulo ${i + 1} debe tener una descripción (mínimo 5 caracteres).`;
+            }
+            if (!m.contenidos || m.contenidos.length === 0) {
+                return `El Módulo ${i + 1} no puede quedar vacío. Adjuntá al menos un Video o PowerPoint.`;
+            }
+            for (let j = 0; j < m.contenidos.length; j++) {
+                const c = m.contenidos[j];
+                if (!c.titulo.trim()) {
+                    return `Completá el título del contenido #${j + 1} en el Módulo ${i + 1}.`;
+                }
+                if (!c.archivo_nombre.trim() || ARCHIVOS_PROHIBIDOS.includes(c.archivo_nombre.trim())) {
+                    return `Debés subir un archivo real para "${c.titulo}" en el Módulo ${i + 1}.`;
+                }
+            }
+        }
+        return null;
+    };
+    
     const addModulo = () => {
         setWizardData((prev) => ({
             ...prev,
@@ -252,11 +279,20 @@ const triggerToast = (msg: string) => {
                 ...prev.modulos,
                 {
                     titulo: `Módulo ${prev.modulos.length + 1}`,
+                    descripcion:'',
                     dia_liberacion: prev.modulos.length + 1,
                     contenidos: [],
                 },
             ],
         }));
+    };
+
+    const updateModuloDescripcion = (mIdx: number, descripcion: string) => {
+        setWizardData((prev) => {
+            const copia = [...prev.modulos];
+            copia[mIdx] = { ...copia[mIdx], descripcion };
+            return { ...prev, modulos: copia };
+        });
     };
 
     const removeModulo = (mIdx: number) => {
@@ -282,9 +318,10 @@ const triggerToast = (msg: string) => {
         setWizardData((prev) => {
             const copia = [...prev.modulos];
             const nuevo: ContenidoItem = {
-                titulo: tipo === 'Video' ? 'Nuevo Video de Capacitación' : 'Nueva Presentación PowerPoint',
+                titulo: '',
                 tipo_recurso: tipo,
-                archivo_nombre: tipo === 'Video' ? 'Video_Seguridad.mp4' : 'Diapositivas_EPP.pptx',
+                archivo_nombre: '',
+                url_streaming: null,
             };
             copia[mIdx] = {
                 ...copia[mIdx],
@@ -436,12 +473,16 @@ const triggerToast = (msg: string) => {
                 triggerToast('Completá el nombre del curso y su fecha de vencimiento.');
                 return;
             }
+            if (wizardData.tiempo_vigencia < mananaISO) {
+                triggerToast('La fecha de vencimiento debe ser posterior a la fecha actual.');
+                return;
+            }
             await syncDraft(wizardData);
             setStep(2);
         } else if (step === 2) {
-            const sinTitulo = wizardData.modulos.some((m) => !m.titulo.trim());
-            if (sinTitulo) {
-                triggerToast('Todos los módulos deben tener un título.');
+            const errorMod = validarModulos();
+            if (errorMod) {
+                triggerToast(errorMod);
                 return;
             }
             await syncDraft(wizardData);
@@ -464,6 +505,21 @@ const triggerToast = (msg: string) => {
             setStep(1);
             triggerToast('Completá el nombre y fecha de vencimiento en la Sección 1.');
             return;
+        }
+
+        if (wizardData.tiempo_vigencia < mananaISO) {
+            setStep(1);
+            triggerToast('La fecha de vencimiento debe ser posterior a la fecha actual.');
+            return;
+        }
+
+       if (wizardData.estado_curso !== 'Borrador') {
+            const errorMod = validarModulos();
+            if (errorMod) {
+                setStep(2);
+                triggerToast(errorMod);
+                return;
+            }
         }
 
         const pregIncompleta = wizardData.cuestionario.preguntas.some(
@@ -615,6 +671,7 @@ const triggerToast = (msg: string) => {
                                     <input
                                         type="date"
                                         required
+                                        min={mananaISO}
                                         value={wizardData.tiempo_vigencia}
                                         onChange={(e) =>
                                             setWizardData({
@@ -743,7 +800,7 @@ const triggerToast = (msg: string) => {
                                                         updateModuloTitulo(mIdx, e.target.value)
                                                     }
                                                     placeholder="Título del módulo..."
-                                                    className="w-full px-3 py-1.5 rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] font-semibold text-[15px]"
+                                                    className="w-full px-3 py-1.5 rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[#1F2328] dark:text-[#ECEFEC] font-semibold text-[15px]"
                                                 />
                                             </div>
 
@@ -756,6 +813,22 @@ const triggerToast = (msg: string) => {
                                                 <Trash2 className="h-4 w-4" />
                                             </button>
                                         </div>
+
+                                        <textarea
+                                            rows={2}
+                                            value={mod.descripcion}
+                                            onChange={(e) =>
+                                                updateModuloDescripcion(mIdx, e.target.value)
+                                            }
+                                            placeholder="Descripción del módulo: objetivo y temas que verá el colaborador..."
+                                            className="w-full px-3 py-2 rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[#1F2328] dark:text-[#ECEFEC] text-[13.5px] outline-none focus:border-[#2F6F5E]"
+                                        />
+
+                                        {mod.contenidos.length === 0 && (
+                                            <p className="text-[12.5px] text-[#B5651D] dark:text-[#E3A15A] m-0">
+                                                Este módulo está vacío. Adjuntá al menos un Video o PowerPoint real para poder continuar.
+                                            </p>
+                                        )}
 
                                         {/* Lista de contenidos adjuntos (Videos / PowerPoints) */}
                                         <div className="grid gap-2.5">

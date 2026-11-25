@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 use Illuminate\Support\Facades\Auth;
 use App\Models\AuditAdmin;
 use App\Models\User;
+use App\Models\ProgresoCurso;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -26,6 +27,9 @@ class UserController extends Controller
         $query = User::with('roles:id,name')
             // Filtramos para no mostrar al SuperAdmin en la tabla operativa si es necesario
             ->select('id', 'nombre_completo', 'dni', 'legajo', 'email', 'rol', 'zona_geografica_establecimient','centro_costo' ,'estado_operativo')
+            ->withCount([
+                'progresos as cursos_bloqueados_count' => fn($q) => $q->where('estado', 'Bloqueado'),
+            ])
             ->whereIn('rol', ['Operario', 'Supervisor']);
 
         if ($request->filled('search')) {
@@ -104,9 +108,18 @@ class UserController extends Controller
     public function show($id): Response
     {
         $colaborador = User::with([
-            'progresos.curso:id_curso,nombre',
             'cuadrillas:id_cuadrilla,nombre_cuadrilla',
+            'progresos' => function ($q) {
+                $q->with([
+                    'curso:id_curso,nombre',
+                    'respuestas' => fn($r) => $r->orderByDesc('created_at'),
+                ])->withCount('respuestas');
+            },
         ])->findOrFail($id);
+
+        $colaborador->progresos->each(function ($prog) {
+            $prog->intentos_ciclo_actual = $prog->intentosCicloActual();
+        });
 
         return Inertia::render('colaboradores/show', [
             'colaborador' => $colaborador,
@@ -216,7 +229,7 @@ class UserController extends Controller
         $estado = $request->input('estado', '');
         $orden = $request->input('orden', 'nombre_completo');
         $direccion = strtolower($request->input('direccion', 'asc'));
-
+        $soloBloqueados = $request->boolean('solo_bloqueados', false);
         $camposPermitidos = ['nombre_completo', 'legajo', 'dni', 'rol', 'estado_operativo'];
         if (!in_array($orden, $camposPermitidos, true)) {
             $orden = 'nombre_completo';
@@ -231,6 +244,7 @@ class UserController extends Controller
             'rol'       => $rol,
             'zona'      => $zona,
             'estado'    => $estado,
+            'solo_bloqueados' => $soloBloqueados,
             'orden'     => $orden,
             'direccion' => $direccion,
         ];
@@ -238,6 +252,37 @@ class UserController extends Controller
         return Excel::download(
             new ColaboradoresExport($filtros),
             'directorio_colaboradores_' . now()->format('Ymd_His') . '.xlsx'
+        );
+    }
+
+    #[Middleware('permission:editar_colaborador')]
+    public function unlockCourse($userId, $progresoId): RedirectResponse
+    {
+        $progreso = ProgresoCurso::with(['usuario', 'curso'])
+            ->where('id_progreso', $progresoId)
+            ->where('id_usuario', $userId)
+            ->firstOrFail();
+
+        $progreso->update([
+            'estado'               => 'En_Curso',
+            'ultimo_desbloqueo_at' => now(),
+            'veces_desbloqueado'   => ($progreso->veces_desbloqueado ?? 0) + 1,
+        ]);
+
+        if (Auth::id()) {
+            AuditAdmin::create([
+                'id_usuario'          => Auth::id(),
+                'id_usuario_afectado' => $progreso->id_usuario,
+                'id_curso'            => $progreso->id_curso,
+                'accion'              => "Desbloqueo de evaluación en {$progreso->curso->nombre} (Desbloqueo #{$progreso->veces_desbloqueado})",
+                'fecha_evento'        => now(),
+                'estado_resultante'   => 'En_Curso',
+            ]);
+        }
+
+        return redirect()->back()->with(
+            'success',
+            "Curso \"{$progreso->curso->nombre}\" desbloqueado. Se reiniciaron los intentos disponibles manteniendo el registro histórico real."
         );
     }
 }

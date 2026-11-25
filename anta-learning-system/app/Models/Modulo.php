@@ -13,6 +13,7 @@ class Modulo extends Model
     protected $fillable = [
         'id_curso',
         'titulo',
+        'descripcion',
         'dia_liberacion',
         'orden',
     ];

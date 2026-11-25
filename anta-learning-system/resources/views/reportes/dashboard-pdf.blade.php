@@ -174,7 +174,9 @@
                 <span class="company-tag">Anta del Dorado · Recursos Humanos e Higiene y Seguridad</span>
                 <h1>Reporte Ejecutivo de Estado de Inducciones</h1>
                 <p class="subtitle">
-                    Filtro de Nodo / Planta: <strong>{{ $zona ?: 'Todos los Nodos Productivos' }}</strong>
+                    Nodo / Planta: <strong>{{ $zona ?: 'Todos' }}</strong> &nbsp;|&nbsp;
+                    Departamento: <strong>{{ $depto ?: 'Todos' }}</strong> &nbsp;|&nbsp;
+                    Período: <strong>{{ $rangoLabel ?? 'Histórico completo' }}</strong>
                 </p>
             </td>
             <td class="meta-box">

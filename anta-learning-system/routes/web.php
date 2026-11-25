@@ -36,11 +36,12 @@ Route::middleware(['auth', 'verified', 'dashboard.access'])->group(function () {
     ->name('profile.test-email');
 
     // Rutas colaboradores
+    Route::get('/colaboradores/export', [UserController::class, 'export'])->name('colaboradores.export');
     Route::resource('colaboradores',UserController::class);
     Route::patch('/colaboradores/{id}/status', [UserController::class, 'updateStatus'])->name('colaboradores.status');
     Route::post('/colaboradores/{id}/reset-password', [UserController::class, 'forcePasswordReset'])->name('colaboradores.reset-password');
-        Route::get('/colaboradores/export', [UserController::class, 'export'])
-        ->name('colaboradores.export');
+    Route::post('/colaboradores/{userId}/progresos/{progresoId}/desbloquear', [UserController::class, 'unlockCourse'])
+    ->name('colaboradores.unlock-course');
     
     // Rutas para Cuadrillas
     Route::resource('cuadrillas',CuadrillaController::class);

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Head, Link, router } from '@inertiajs/react';
+import React, { useState, useEffect } from 'react';
+import { Head, Link, router,usePage } from '@inertiajs/react';
 import { useAuth } from '@/hooks/use-auth';
 import AppLayout from '@/Layouts/app-layout';
 import {
@@ -8,11 +8,7 @@ import {
     KeyRound,
     UserCheck,
     UserX,
-    Calendar,
-    Briefcase,
-    Building2,
-    CheckCircle2,
-    AlertCircle,
+    Unlock,
 } from 'lucide-react';
 
 interface Evaluacion {
@@ -36,9 +32,13 @@ interface ColaboradorDetalle {
     avance?: number;
     progresos?: Array<{
         id_progreso: number;
+        id_curso: number;
         estado: string;
         porcentaje_avance: number;
-        curso?: { nombre: string };
+        intentos_ciclo_actual?: number;
+        respuestas_count?: number;
+        veces_desbloqueado?: number;
+        curso?: { id_curso: number; nombre: string };
     }>;
 }
 
@@ -55,6 +55,16 @@ const HISTORIAL_MOCK: Evaluacion[] = [
 const ESTADOS_BAJA = ['Suspendido', 'Inactivo', 'Vacaciones', 'Lesionado', 'Siniestrado'];
 
 export default function ColaboradorShow({ colaborador }: Props) {
+    const { flash } = usePage<any>().props;
+    const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (flash?.success) {
+            setToastMsg(flash.success);
+            setTimeout(() => setToastMsg(null), 3200);
+        }
+    }, [flash]);
+
     const [evalSearch, setEvalSearch] = useState('');
     const [confirmModal, setConfirmModal] = useState<{
         title: string;
@@ -124,7 +134,7 @@ export default function ColaboradorShow({ colaborador }: Props) {
                                 <h1 className="text-[26px] font-bold text-[#1F2328] dark:text-[#ECEFEC] m-0">
                                     {colaborador.nombre_completo}
                                 </h1>
-                                <span className={`px-2.5 py-0.5 rounded-full text-[17px] font-semibold ${getChipClasses(colaborador.estado_operativo)}`}>
+                                <span className={`px-2.5 py-0.5 rounded-full text-[12px] font-semibold ${getChipClasses(colaborador.estado_operativo)}`}>
                                     {colaborador.estado_operativo}
                                 </span>
                             </div>
@@ -226,6 +236,100 @@ export default function ColaboradorShow({ colaborador }: Props) {
                             <b className="text-[#1F2328] dark:text-[#ECEFEC] font-medium">{colaborador.estado_operativo}</b>
                         </div>
                     </div>
+                </div>
+
+                {/* TARJETA 1.5: CURSOS ASIGNADOS Y CONTROL DE BLOQUEOS */}
+                <div className="bg-white dark:bg-[#1B1F1C] border border-[#E9E9E7] dark:border-[#2A302B] rounded-[16px] p-6 shadow-sm">
+                    <h2 className="text-[17px] font-bold text-[#1F2328] dark:text-[#ECEFEC] m-0 mb-4 pb-2 border-b border-[#E9E9E7] dark:border-[#2A302B]">
+                        Cursos asignados y control de intentos
+                    </h2>
+
+                    {colaborador.progresos && colaborador.progresos.length > 0 ? (
+                        <div className="overflow-x-auto border border-[#E9E9E7] dark:border-[#2A302B] rounded-[10px]">
+                            <table className="w-full table-fixed border-collapse text-left text-[14px]">
+                                <thead>
+                                    <tr className="border-b border-[#E9E9E7] dark:border-[#2A302B] bg-[#F7F7F6]/60 dark:bg-[#141714]/40">
+                                        <th className="w-[34%] py-2.5 px-4 font-medium text-[#6B7280]">Curso</th>
+                                        <th className="w-[18%] py-2.5 px-3 font-medium text-[#6B7280]">Estado / Avance</th>
+                                        <th className="w-[26%] py-2.5 px-3 font-medium text-[#6B7280]">Intentos (Ciclo / Real)</th>
+                                        <th className="w-[22%] py-2.5 px-4 font-medium text-[#6B7280] text-right">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-[#E9E9E7] dark:divide-[#2A302B]">
+                                    {colaborador.progresos.map((prog) => {
+                                        const bloqueado = prog.estado === 'Bloqueado';
+                                        return (
+                                            <tr
+                                                key={prog.id_progreso}
+                                                className={bloqueado ? 'bg-[#B3372B]/[0.05]' : ''}
+                                            >
+                                                <td className="py-3 px-4 font-semibold text-[#1F2328] dark:text-[#ECEFEC] truncate">
+                                                    {prog.curso?.nombre ?? `Curso #${prog.id_curso}`}
+                                                </td>
+                                                <td className="py-3 px-3">
+                                                    <span
+                                                        className={`inline-block px-2.5 py-0.5 rounded-full text-[12px] font-semibold ${
+                                                            bloqueado
+                                                                ? 'bg-[#B3372B] text-white'
+                                                                : prog.estado === 'Completado'
+                                                                ? 'bg-[#2F7D4F]/15 text-[#2F7D4F]'
+                                                                : 'bg-[#B5651D]/15 text-[#B5651D]'
+                                                        }`}
+                                                    >
+                                                        {prog.estado} ({prog.porcentaje_avance}%)
+                                                    </span>
+                                                </td>
+                                                <td className="py-3 px-3 text-[13px]">
+                                                    <span className="block text-[#1F2328] dark:text-[#ECEFEC]">
+                                                        Ciclo actual: <b>{prog.intentos_ciclo_actual ?? 0} / 3</b>
+                                                    </span>
+                                                    <span className="block text-[12px] text-[#6B7280]">
+                                                        Total real: <b>{prog.respuestas_count ?? 0}</b> · Desbloqueos: <b>{prog.veces_desbloqueado ?? 0}</b>
+                                                    </span>
+                                                </td>
+                                                <td className="py-3 px-4 text-right">
+                                                    {bloqueado && can('editar_colaborador') ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setConfirmModal({
+                                                                    title: 'Desbloquear evaluación del curso',
+                                                                    message: `Se habilitarán 3 nuevos intentos para "${prog.curso?.nombre}" a ${colaborador.nombre_completo}. Los ${prog.respuestas_count ?? 0} intentos previos quedarán registrados en el historial real.`,
+                                                                    confirmText: 'Desbloquear curso',
+                                                                    onConfirm: () => {
+                                                                        router.post(
+                                                                            `/colaboradores/${colaborador.id}/progresos/${prog.id_progreso}/desbloquear`,
+                                                                            {},
+                                                                            {
+                                                                                preserveScroll: true,
+                                                                                onSuccess: () => setConfirmModal(null),
+                                                                            }
+                                                                        );
+                                                                    },
+                                                                })
+                                                            }
+                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-[#2F6F5E] text-white text-[13px] font-semibold hover:bg-[#2F7D4F] transition cursor-pointer"
+                                                        >
+                                                            <Unlock className="h-3.5 w-3.5" />
+                                                            Desbloquear
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-[12px] text-[#6B7280]">
+                                                            {bloqueado ? 'Bloqueado' : 'Habilitado'}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <p className="text-[14px] text-[#6B7280] m-0">
+                            Este colaborador aún no tiene cursos asignados.
+                        </p>
+                    )}
                 </div>
 
                 {/* TARJETA 2: AVANCE DE CAPACITACIÓN */}
@@ -338,6 +442,15 @@ export default function ColaboradorShow({ colaborador }: Props) {
                             </button>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {toastMsg && (
+                <div
+                    role="status"
+                    className="fixed bottom-7 left-1/2 -translate-x-1/2 z-50 bg-[#1F2328] dark:bg-[#ECEFEC] text-white dark:text-[#141714] px-5 py-3 rounded-[10px] shadow-lg text-[14px] font-medium"
+                >
+                    {toastMsg}
                 </div>
             )}
         </AppLayout>

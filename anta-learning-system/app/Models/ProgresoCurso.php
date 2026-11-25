@@ -10,22 +10,25 @@ class ProgresoCurso extends Model
     protected $primaryKey = 'id_progreso';
 
     protected $fillable = [
-        'id_usuario',
-        'id_curso',
-        'id_cuadrilla',
-        'fecha_inicio',
-        'fecha_finalizacion',
-        'porcentaje_avance',
-        'ultima_visita',
-        'url_certificado_pdf',
-        'valoracion_curso',
-        'estado',
-    ];
+    'id_usuario',
+    'id_curso',
+    'id_cuadrilla',
+    'fecha_inicio',
+    'fecha_finalizacion',
+    'porcentaje_avance',
+    'ultima_visita',
+    'url_certificado_pdf',
+    'valoracion_curso',
+    'estado',
+    'ultimo_desbloqueo_at',
+    'veces_desbloqueado',
+];
 
     protected $casts = [
         'fecha_inicio' => 'date',
         'fecha_finalizacion' => 'date',
         'ultima_visita' => 'datetime',
+        'ultimo_desbloqueo_at' => 'datetime',
     ];
 
     public function usuario()
@@ -46,5 +49,13 @@ class ProgresoCurso extends Model
     public function respuestas()
     {
         return $this->hasMany(RespuestaUsuario::class, 'id_progreso', 'id_progreso');
+    }
+
+    // Helper para consultar los intentos consumidos desde el último desbloqueo
+    public function intentosCicloActual(): int
+    {
+        return $this->respuestas()
+            ->when($this->ultimo_desbloqueo_at, fn($q) => $q->where('created_at', '>', $this->ultimo_desbloqueo_at))
+            ->count();
     }
 }

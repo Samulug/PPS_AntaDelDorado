@@ -22,6 +22,7 @@ interface Colaborador {
     zona_geografica_establecimient: string;
     centro_costo: string;
     estado_operativo: string;
+    cursos_bloqueados_count?: number;
 }
 
 interface Props {
@@ -61,6 +62,7 @@ export default function ColaboradoresIndex({ users = [], filters = {} }: Props) 
         rol: 'Todos',
         nodo: 'Todos',
         estado: 'Todos',
+        soloBloqueados: false,
     });
 
     const [colabApplied, setColabApplied] = useState({
@@ -69,6 +71,7 @@ export default function ColaboradoresIndex({ users = [], filters = {} }: Props) 
         rol: 'Todos',
         nodo: 'Todos',
         estado: 'Todos',
+        soloBloqueados:false,
     });
 
     const [colabPage, setColabPage] = useState(1);
@@ -98,7 +101,7 @@ export default function ColaboradoresIndex({ users = [], filters = {} }: Props) 
     };
 
     const resetColabFilters = () => {
-        const clean = { search: '', sort: 'az' as const, rol: 'Todos', nodo: 'Todos', estado: 'Todos' };
+        const clean = { search: '', sort: 'az' as const, rol: 'Todos', nodo: 'Todos', estado: 'Todos', soloBloqueados:false};
         setColabDraft(clean);
         setColabApplied(clean);
         setShowColabSearch(false);
@@ -108,13 +111,16 @@ export default function ColaboradoresIndex({ users = [], filters = {} }: Props) 
     const processedColabs = useMemo(() => {
         const q = colabApplied.search.toLowerCase().trim();
 
+        
+
         const filtered = users.filter((u) => {
             const matchText =
                 !q ||
                 `${u.nombre_completo} ${u.dni} ${u.legajo} ${u.email || ''} ${u.rol || ''} ${u.zona_geografica_establecimient || ''} ${u.centro_costo || ''} ${u.estado_operativo || ''}`
                     .toLowerCase()
                     .includes(q);
-
+            const matchBloqueados =
+                !colabApplied.soloBloqueados || (u.cursos_bloqueados_count ?? 0) > 0;
             const matchRol = colabApplied.rol === 'Todos' || u.rol === colabApplied.rol;
             const matchNodo =
                 colabApplied.nodo === 'Todos' ||
@@ -122,10 +128,14 @@ export default function ColaboradoresIndex({ users = [], filters = {} }: Props) 
             const matchEstado =
                 colabApplied.estado === 'Todos' || u.estado_operativo === colabApplied.estado;
 
-            return matchText && matchRol && matchNodo && matchEstado;
+            return matchText && matchRol && matchNodo && matchEstado && matchBloqueados;
         });
 
         filtered.sort((a, b) => {
+            const bloqA = (a.cursos_bloqueados_count ?? 0) > 0 ? 1 : 0;
+            const bloqB = (b.cursos_bloqueados_count ?? 0) > 0 ? 1 : 0;
+            if (bloqA !== bloqB) return bloqB - bloqA;
+
             const cmp = a.nombre_completo.localeCompare(b.nombre_completo, 'es', {
                 sensitivity: 'base',
             });
@@ -157,6 +167,7 @@ export default function ColaboradoresIndex({ users = [], filters = {} }: Props) 
             rol: colabApplied.rol !== 'Todos' ? colabApplied.rol : '',
             zona: colabApplied.nodo !== 'Todos' ? colabApplied.nodo : '',
             estado: colabApplied.estado !== 'Todos' ? colabApplied.estado : '',
+            solo_bloqueados: colabApplied.soloBloqueados ? '1' : '',
             orden: 'nombre_completo',
             direccion: colabApplied.sort === 'za' ? 'desc' : 'asc',
         }).toString();
@@ -308,6 +319,23 @@ export default function ColaboradoresIndex({ users = [], filters = {} }: Props) 
                                     </option>
                                 ))}
                             </select>
+                            
+                            <label className="inline-flex items-center gap-1.5 min-h-[38px] px-2.5 rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[13px] cursor-pointer shrink-0">
+                                <input
+                                    type="checkbox"
+                                    checked={colabDraft.soloBloqueados}
+                                    onChange={(e) =>
+                                        setColabDraft({
+                                            ...colabDraft,
+                                            soloBloqueados: e.target.checked,
+                                        })
+                                    }
+                                    className="accent-[#B3372B] w-3.5 h-3.5"
+                                />
+                                <span className="text-[#B3372B] dark:text-[#EE8274] font-medium">
+                                    Con bloqueos
+                                </span>
+                            </label>
                         </div>
 
                         {/* Lado Derecho Fijo: Filtrar y Resetear NO se mueven */}
@@ -354,51 +382,65 @@ export default function ColaboradoresIndex({ users = [], filters = {} }: Props) 
                         </thead>
                         <tbody className="divide-y divide-[#E9E9E7] dark:divide-[#2A302B] text-[14px]">
                             {paginatedColabs.length > 0 ? (
-                                paginatedColabs.map((colab) => (
-                                    <tr
-                                        key={colab.id}
-                                        tabIndex={0}
-                                        onClick={() => router.visit(`/colaboradores/${colab.id}`)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') router.visit(`/colaboradores/${colab.id}`);
-                                        }}
-                                        className="hover:bg-[#F7F7F6] dark:hover:bg-[#141714] transition-colors cursor-pointer"
-                                    >
-                                        <td className="py-3.5 px-5 align-middle">
-                                            <b className="font-semibold text-[#1F2328] dark:text-[#ECEFEC] block truncate">
-                                                {colab.nombre_completo}
-                                            </b>
-                                            <span className="text-[12px] text-[#6B7280] dark:text-[#9AA39D]">
-                                                DNI: {colab.dni}
-                                            </span>
-                                        </td>
-                                        <td className="py-3.5 px-4 align-middle">
-                                            <span className="font-medium text-[#1F2328] dark:text-[#ECEFEC] block">
-                                                Legajo #{colab.legajo}
-                                            </span>
-                                            <span className="text-[12px] text-[#6B7280] dark:text-[#9AA39D] block truncate">
-                                                {colab.email}
-                                            </span>
-                                        </td>
-                                        <td className="py-3.5 px-4 align-middle">
-                                            <span className="font-medium text-[#1F2328] dark:text-[#ECEFEC] block truncate">
-                                                {colab.rol} · {colab.zona_geografica_establecimient}
-                                            </span>
-                                            <span className="text-[12px] text-[#6B7280] dark:text-[#9AA39D] block truncate">
-                                                Depto: {colab.centro_costo}
-                                            </span>
-                                        </td>
-                                        <td className="py-3.5 px-5 align-middle text-right">
-                                            <span
-                                                className={`inline-block px-2.5 py-0.5 rounded-full text-[12px] font-medium ${getChipClasses(
-                                                    colab.estado_operativo
-                                                )}`}
-                                            >
-                                                {colab.estado_operativo}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))
+                                paginatedColabs.map((colab) => {
+                                    const tieneBloqueos = (colab.cursos_bloqueados_count ?? 0) > 0;
+                                    return (
+                                        <tr
+                                            key={colab.id}
+                                            tabIndex={0}
+                                            onClick={() => router.visit(`/colaboradores/${colab.id}`)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') router.visit(`/colaboradores/${colab.id}`);
+                                            }}
+                                            className={`transition-colors cursor-pointer ${
+                                                tieneBloqueos
+                                                    ? 'bg-[#B3372B]/[0.05] hover:bg-[#B3372B]/[0.09] border-l-4 border-l-[#B3372B]'
+                                                    : 'hover:bg-[#F7F7F6] dark:hover:bg-[#141714]'
+                                            }`}
+                                        >
+                                            <td className="py-3.5 px-5 align-middle">
+                                                <b className="font-semibold text-[#1F2328] dark:text-[#ECEFEC] block truncate">
+                                                    {colab.nombre_completo}
+                                                </b>
+                                                <span className="text-[12px] text-[#6B7280] dark:text-[#9AA39D]">
+                                                    DNI: {colab.dni}
+                                                </span>
+                                            </td>
+                                            <td className="py-3.5 px-4 align-middle">
+                                                <span className="font-medium text-[#1F2328] dark:text-[#ECEFEC] block">
+                                                    Legajo #{colab.legajo}
+                                                </span>
+                                                <span className="text-[12px] text-[#6B7280] dark:text-[#9AA39D] block truncate">
+                                                    {colab.email}
+                                                </span>
+                                            </td>
+                                            <td className="py-3.5 px-4 align-middle">
+                                                <span className="font-medium text-[#1F2328] dark:text-[#ECEFEC] block truncate">
+                                                    {colab.rol} · {colab.zona_geografica_establecimient}
+                                                </span>
+                                                <span className="text-[12px] text-[#6B7280] dark:text-[#9AA39D] block truncate">
+                                                    Depto: {colab.centro_costo}
+                                                </span>
+                                            </td>
+                                            <td className="py-3.5 px-5 align-middle text-right">
+                                                <div className="flex flex-col items-end gap-1">
+                                                    <span
+                                                        className={`inline-block px-2.5 py-0.5 rounded-full text-[12px] font-medium ${getChipClasses(
+                                                            colab.estado_operativo
+                                                        )}`}
+                                                    >
+                                                        {colab.estado_operativo}
+                                                    </span>
+                                                    {tieneBloqueos && (
+                                                        <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#B3372B] text-white">
+                                                            {colab.cursos_bloqueados_count} bloqueado(s)
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             ) : (
                                 <tr>
                                     <td

@@ -54,37 +54,38 @@ export default function CursosIndex({ cursos = [] }: Props) {
         }
     }, [flash]);
 
-    // Formateo legible de fechas (DD/MM/YYYY)
+    const extractISODate = (dateStr?: string) => {
+        if (!dateStr) return '';
+        return String(dateStr).slice(0, 10);
+    };
+
     const formatDate = (dateStr?: string) => {
-        if (!dateStr) return '-';
-        const d = new Date(dateStr);
-        if (isNaN(d.getTime())) return dateStr;
-        return d.toLocaleDateString('es-AR', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-        });
+        const iso = extractISODate(dateStr);
+        if (!iso || !iso.includes('-')) return '-';
+        const [year, month, day] = iso.split('-');
+        return `${day}/${month}/${year}`;
     };
 
     // =========================================================================
     // 1. FILTROS POR COLUMNA Y PAGINACIÓN
     // =========================================================================
+    type OrdenVigencia = 'recientes' | 'antiguos' | 'por_vencer' | 'vencidos';
     const [showSearch, setShowSearch] = useState(false);
     const searchInputRef = useRef<HTMLInputElement>(null);
 
     const [draftFilters, setDraftFilters] = useState({
         search: '',
         sort: 'az' as 'az' | 'za',
-        creacion: '',
-        vencimiento: '',
+        fechaExacta: '',
+        ordenVigencia: 'recientes' as OrdenVigencia,
         estado: 'Todos',
     });
 
     const [appliedFilters, setAppliedFilters] = useState({
         search: '',
         sort: 'az' as 'az' | 'za',
-        creacion: '',
-        vencimiento: '',
+        fechaExacta: '',
+        ordenVigencia: 'recientes' as OrdenVigencia,
         estado: 'Todos',
     });
 
@@ -100,8 +101,8 @@ export default function CursosIndex({ cursos = [] }: Props) {
         const clean = {
             search: '',
             sort: 'az' as const,
-            creacion: '',
-            vencimiento: '',
+            fechaExacta: '',
+            ordenVigencia: 'recientes' as OrdenVigencia,
             estado: 'Todos',
         };
         setDraftFilters(clean);
@@ -112,6 +113,9 @@ export default function CursosIndex({ cursos = [] }: Props) {
 
     const processedCursos = useMemo(() => {
         const q = appliedFilters.search.toLowerCase().trim();
+        const hoy = new Date();
+        const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+
 
         const filtered = cursos.filter((c) => {
             const reqName = (c.cursos_requeridos && c.cursos_requeridos.length > 0) ? c.cursos_requeridos.map((req: any) => req.nombre).join(' • ') : '';
@@ -125,25 +129,42 @@ export default function CursosIndex({ cursos = [] }: Props) {
                 appliedFilters.estado === 'Todos' ||
                 c.estado_curso === appliedFilters.estado;
 
-            const fechaCreacionISO = c.created_at ? c.created_at.slice(0, 10) : '';
-            const fechaVencISO = c.tiempo_vigencia ? c.tiempo_vigencia.slice(0, 10) : '';
+            const fechaCreacionISO = extractISODate(c.created_at);
+            const fechaVencISO = extractISODate(c.tiempo_vigencia);
 
-            const matchCreacion =
-                !appliedFilters.creacion || fechaCreacionISO === appliedFilters.creacion;
+            const matchFecha =
+                !appliedFilters.fechaExacta ||
+                fechaCreacionISO === appliedFilters.fechaExacta ||
+                fechaVencISO === appliedFilters.fechaExacta;
 
-            const matchVencimiento =
-                !appliedFilters.vencimiento || fechaVencISO === appliedFilters.vencimiento;
+            let matchVigencia = true;
+            if (appliedFilters.ordenVigencia === 'por_vencer') {
+                matchVigencia = Boolean(fechaVencISO) && fechaVencISO >= hoyISO;
+            } else if (appliedFilters.ordenVigencia === 'vencidos') {
+                matchVigencia = Boolean(fechaVencISO) && fechaVencISO < hoyISO;
+            }
 
-            return matchText && matchEstado && matchCreacion && matchVencimiento;
+            return matchText && matchEstado && matchFecha && matchVigencia;
         });
 
         filtered.sort((a, b) => {
-            // Priorizar siempre los cursos en estado "Borrador" al principio de la tabla
-            if (a.estado_curso === 'Borrador' && b.estado_curso !== 'Borrador') return -1;
-            if (a.estado_curso !== 'Borrador' && b.estado_curso === 'Borrador') return 1;
+            const creacionA = new Date(a.created_at || 0).getTime();
+            const creacionB = new Date(b.created_at || 0).getTime();
+            const vencA = extractISODate(a.tiempo_vigencia) || '9999-12-31';
+            const vencB = extractISODate(b.tiempo_vigencia) || '9999-12-31';
 
-            const cmp = a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' });
-            return appliedFilters.sort === 'az' ? cmp : -cmp;
+            switch (appliedFilters.ordenVigencia) {
+                case 'recientes':
+                    return creacionB - creacionA;
+                case 'antiguos':
+                    return creacionA - creacionB;
+                case 'por_vencer':
+                    return vencA.localeCompare(vencB);
+                case 'vencidos':
+                    return vencB.localeCompare(vencA);
+            default:
+                    return a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' });
+            }
         });
 
         return filtered;
@@ -290,25 +311,36 @@ export default function CursosIndex({ cursos = [] }: Props) {
                                 <option value="za">Z-A</option>
                             </select>
 
-                            <span className="text-[13px] text-[#6B7280] shrink-0">Creación:</span>
+                            <span className="text-[13px] text-[#6B7280] shrink-0">Fecha:</span>
                             <input
                                 type="date"
-                                value={draftFilters.creacion}
+                                title="Busca coincidencia exacta en fecha de creación o de vencimiento"
+                                value={draftFilters.fechaExacta}
                                 onChange={(e) =>
-                                    setDraftFilters({ ...draftFilters, creacion: e.target.value })
+                                    setDraftFilters({
+                                        ...draftFilters,
+                                        fechaExacta: e.target.value,
+                                    })
                                 }
                                 className="py-[6px] min-h-[38px] rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[13px] px-2.5"
                             />
 
-                            <span className="text-[13px] text-[#6B7280] shrink-0">Vencimiento:</span>
-                            <input
-                                type="date"
-                                value={draftFilters.vencimiento}
+                            <span className="text-[13px] text-[#6B7280] shrink-0">Orden / Vigencia:</span>
+                            <select
+                                value={draftFilters.ordenVigencia}
                                 onChange={(e) =>
-                                    setDraftFilters({ ...draftFilters, vencimiento: e.target.value })
+                                    setDraftFilters({
+                                        ...draftFilters,
+                                        ordenVigencia: e.target.value as OrdenVigencia,
+                                    })
                                 }
-                                className="py-[6px] min-h-[38px] rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[13px] px-2.5"
-                            />
+                                className="py-[7px] min-h-[38px] rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[13px] px-2.5"
+                            >
+                                <option value="recientes">Creación: Más recientes</option>
+                                <option value="antiguos">Creación: Más antiguos</option>
+                                <option value="por_vencer">Por vencer (próximos 30 días)</option>
+                                <option value="vencidos">Vencidos</option>
+                            </select>
 
                             <span className="text-[13px] text-[#6B7280] shrink-0">Estado:</span>
                             <select

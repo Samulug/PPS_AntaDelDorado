@@ -221,7 +221,11 @@ export default function CursoShow({ curso }: any) {
                                     <b className="text-[15px] text-[#1F2328] dark:text-[#ECEFEC] block mb-2.5">
                                         {mod.titulo}
                                     </b>
-
+                                    {mod.descripcion && (
+                                        <p className="text-[13.5px] text-[#6B7280] dark:text-[#9AA39D] mt-0 mb-3 leading-relaxed">
+                                            {mod.descripcion}
+                                        </p>
+                                    )}
                                     {contenidosMultimedia.length > 0 ? (
                                         <div className="grid gap-2">
                                             {contenidosMultimedia.map((lec: any) => (

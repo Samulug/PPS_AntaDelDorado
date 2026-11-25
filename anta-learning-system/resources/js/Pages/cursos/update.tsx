@@ -18,6 +18,11 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
     const [uploadProgress, setUploadProgress] = useState<number>(0);
     const [previewItem, setPreviewItem] = useState<any | null>(null);
 
+    const mananaISO = useMemo(() => {
+            const d = new Date();
+            d.setDate(d.getDate() + 1);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }, []);
 
 
     // Extraer módulos y cuestionario existentes del cursoEditable
@@ -33,6 +38,7 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
                 } else {
                     contenidos.push({
                         titulo: l.titulo,
+                        descripcion: l.descripcion || '',
                         tipo_recurso: l.tipo_recurso === 'Video' ? 'Video' : 'Presentacion_Filminas',
                         archivo_nombre: l.id_sharepoint_item || 'Archivo_Adjunto.pptx',
                         url_streaming: l.url_recurso || null, // <- IMPORTANTE
@@ -41,12 +47,13 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
             });
             mods.push({
                 titulo: m.titulo || `Módulo ${idx + 1}`,
+                descripcion : m.descripcion || '',
                 dia_liberacion: m.dia_liberacion || idx + 1,
                 contenidos,
             });
         });
 
-        if (mods.length === 0) mods.push({ titulo: 'Módulo 1', dia_liberacion: 1, contenidos: [] });
+        if (mods.length === 0) mods.push({ titulo: 'Módulo 1', descripcion: '', dia_liberacion: 1, contenidos: [] });
 
         const quiz = quizEncontrado
             ? {
@@ -164,6 +171,40 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
         }
     };
 
+    const ARCHIVOS_PROHIBIDOS = [
+        'Capacitacion_Inicial.pptx',
+        'Video_Seguridad.mp4',
+        'Diapositivas_EPP.pptx',
+        'Diapositivas.pptx',
+        'Archivo_Adjunto.pptx',
+        'sp-item-prototipo',
+    ];
+
+    const validarModulos = (): string | null => {
+        for (let i = 0; i < wizardData.modulos.length; i++) {
+            const m = wizardData.modulos[i];
+            if (!m.titulo.trim()) return `El Módulo ${i + 1} debe tener un título.`;
+            if (!m.descripcion?.trim() || m.descripcion.trim().length < 5) {
+                return `El Módulo ${i + 1} debe tener una descripción (mínimo 5 caracteres).`;
+            }
+            if (!m.contenidos || m.contenidos.length === 0) {
+                return `El Módulo ${i + 1} no puede quedar vacío. Adjuntá al menos un Video o PowerPoint.`;
+            }
+            for (let j = 0; j < m.contenidos.length; j++) {
+                const c = m.contenidos[j];
+                if (!c.titulo.trim()) {
+                    return `Completá el título del contenido #${j + 1} en el Módulo ${i + 1}.`;
+                }
+                if (!c.archivo_nombre.trim() || ARCHIVOS_PROHIBIDOS.includes(c.archivo_nombre.trim())) {
+                    return `Debés subir un archivo real para "${c.titulo}" en el Módulo ${i + 1}.`;
+                }
+            }
+        }
+        return null;
+    };
+
+    
+
     // Funciones de edición de Módulos y Cuestionario
     const addModulo = () => {
         setWizardData((prev) => ({
@@ -172,11 +213,20 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
                 ...prev.modulos,
                 {
                     titulo: `Módulo ${prev.modulos.length + 1}`,
+                    descripcion: '',
                     dia_liberacion: prev.modulos.length + 1,
                     contenidos: [],
                 },
             ],
         }));
+    };
+
+    const updateModuloDescripcion = (mIdx: number, descripcion: string) => {
+        setWizardData((prev) => {
+            const copia = [...prev.modulos];
+            copia[mIdx] = { ...copia[mIdx], descripcion };
+            return { ...prev, modulos: copia };
+        });
     };
 
     const removeModulo = (mIdx: number) => {
@@ -206,13 +256,10 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
                 contenidos: [
                     ...copia[mIdx].contenidos,
                     {
-                        titulo:
-                            tipo === 'Video'
-                                ? 'Nuevo Video de Capacitación'
-                                : 'Nueva Presentación PowerPoint',
+                        titulo: '',
                         tipo_recurso: tipo,
-                        archivo_nombre:
-                            tipo === 'Video' ? 'Video_Seguridad.mp4' : 'Diapositivas.pptx',
+                        archivo_nombre: '',
+                        url_streaming: null,
                     },
                 ],
             };
@@ -354,6 +401,21 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
             setStep(1);
             triggerToast('Completá el nombre y la fecha de vencimiento.');
             return;
+        }
+
+        if (wizardData.tiempo_vigencia < mananaISO) {
+            setStep(1);
+            triggerToast('La fecha de vencimiento debe ser posterior a la fecha actual.');
+            return;
+        }
+        
+        if (wizardData.estado_curso !== 'Borrador') {
+            const errorMod = validarModulos();
+            if (errorMod) {
+                setStep(2);
+                triggerToast(errorMod);
+                return;
+            }
         }
         setIsSubmitting(true);
         router.put(`/cursos/${wizardData.id_curso}`, { ...wizardData }, {
@@ -580,6 +642,22 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
                                                 <Trash2 className="h-4 w-4" />
                                             </button>
                                         </div>
+
+                                        <textarea
+                                            rows={2}
+                                            value={mod.descripcion}
+                                            onChange={(e) =>
+                                                updateModuloDescripcion(mIdx, e.target.value)
+                                            }
+                                            placeholder="Descripción del módulo: objetivo y temas que verá el colaborador..."
+                                            className="w-full px-3 py-2 rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[13.5px] outline-none focus:border-[#2F6F5E]"
+                                        />
+
+                                        {mod.contenidos.length === 0 && (
+                                            <p className="text-[12.5px] text-[#B5651D] dark:text-[#E3A15A] m-0">
+                                                Este módulo está vacío. Adjuntá al menos un Video o PowerPoint real para poder continuar.
+                                            </p>
+                                        )}
 
                                         <div className="grid gap-2.5">
                                             {mod.contenidos.map((cont: any, cIdx: number) => {
@@ -824,11 +902,11 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
                     )}
                 </div>
 
-                <footer className="px-8 py-5 border-t border-[#E9E9E7] dark:border-[#2A302B] dark:bg-[#2A302B] bg-[#F7F7F6] flex justify-between gap-4">
+                <footer className="px-8 py-5 border-t border-[#E9E9E7] dark:border-[#2A302B] dark:bg-[#141714] bg-[#F7F7F6] flex justify-between gap-4">
                     <button
                         type="button"
                         onClick={handleClose}
-                        className="px-5 py-2.5 rounded-[10px] border bg-white font-medium text-[#6B7280] cursor-pointer"
+                        className="px-5 py-2.5 rounded-[10px] border bg-white font-medium text-[#6B7280] cursor-pointer dark:bg-[#1B1F1C] dark:text-[#ECEFEC] dark:border-[#2A302B]"
                     >
                         Cancelar
                     </button>
@@ -838,7 +916,7 @@ export default function UpdateCurso({ cursoEditable, cursosDisponibles = [] }: a
                             type="button"
                             disabled={step === 1}
                             onClick={() => setStep((s) => (s - 1) as 1 | 2 | 3)}
-                            className="px-5 py-2.5 rounded-[10px] border text-black bg-white font-semibold flex gap-2 items-center disabled:opacity-50 cursor-pointer"
+                            className="px-5 py-2.5 rounded-[10px] border text-black bg-white font-semibold flex gap-2 items-center disabled:opacity-50 cursor-pointer dark:bg-[#1B1F1C] dark:text-[#ECEFEC] dark:border-[#2A302B]"
                         >
                             <ArrowLeft className="w-4 h-4" />
                             Anterior

@@ -29,26 +29,49 @@ class ColaboradoresExport implements FromQuery, WithHeadings, WithMapping, Shoul
 
     public function query(): Builder
     {
-        $buscar = $this->filters['buscar'] ?? '';
-        $rol = $this->filters['rol'] ?? '';
-        $zona = $this->filters['zona'] ?? '';
-        $estado = $this->filters['estado'] ?? '';
-        $orden = $this->filters['orden'] ?? 'nombre_completo';
-        $direccion = $this->filters['direccion'] ?? 'asc';
+        $buscar         = $this->filters['buscar'] ?? '';
+        $rol            = $this->filters['rol'] ?? '';
+        $zona           = $this->filters['zona'] ?? '';
+        $depto          = $this->filters['depto'] ?? '';
+        $estado         = $this->filters['estado'] ?? '';
+        $rango          = $this->filters['rango'] ?? null;
+        $soloBloqueados = filter_var($this->filters['solo_bloqueados'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $orden          = $this->filters['orden'] ?? 'nombre_completo';
+        $direccion      = $this->filters['direccion'] ?? 'asc';
+
+        $isPgsql = \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'pgsql';
+        $likeOp  = $isPgsql ? 'ilike' : 'like';
+
+        $fechaDesde = match ($rango) {
+            '7'   => now()->subDays(7),
+            '30'  => now()->subDays(30),
+            '90'  => now()->subDays(90),
+            '365' => now()->subYear(),
+            default => null,
+        };
 
         return User::with(['progresos.curso', 'cuadrillas'])
-            ->when($buscar !== '', function ($q) use ($buscar) {
-                $q->where(function ($sub) use ($buscar) {
-                    $sub->where('nombre_completo', 'ilike', "%{$buscar}%")
-                        // En PostgreSQL debes castear los enteros a texto para poder usar LIKE/ILIKE
-                        ->orWhereRaw('CAST(dni AS TEXT) ILIKE ?', ["%{$buscar}%"])
-                        ->orWhereRaw('CAST(legajo AS TEXT) ILIKE ?', ["%{$buscar}%"])
-                        ->orWhere('email', 'ilike', "%{$buscar}%");
+            ->whereIn('rol', ['Operario', 'Supervisor'])
+            ->when($buscar !== '', function ($q) use ($buscar, $isPgsql, $likeOp) {
+                $q->where(function ($sub) use ($buscar, $isPgsql, $likeOp) {
+                    $sub->where('nombre_completo', $likeOp, "%{$buscar}%")
+                        ->orWhere('email', $likeOp, "%{$buscar}%");
+
+                    if ($isPgsql) {
+                        $sub->orWhereRaw('CAST(dni AS TEXT) ILIKE ?', ["%{$buscar}%"])
+                            ->orWhereRaw('CAST(legajo AS TEXT) ILIKE ?', ["%{$buscar}%"]);
+                    } else {
+                        $sub->orWhere('dni', 'like', "%{$buscar}%")
+                            ->orWhere('legajo', 'like', "%{$buscar}%");
+                    }
                 });
             })
             ->when($rol !== '', fn($q) => $q->where('rol', $rol))
             ->when($zona !== '', fn($q) => $q->where('zona_geografica_establecimient', $zona))
+            ->when($depto !== '', fn($q) => $q->where('centro_costo', $depto))
             ->when($estado !== '', fn($q) => $q->where('estado_operativo', $estado))
+            ->when($soloBloqueados, fn($q) => $q->whereHas('progresos', fn($p) => $p->where('estado', 'Bloqueado')))
+            ->when($fechaDesde, fn($q) => $q->whereHas('progresos', fn($p) => $p->where('updated_at', '>=', $fechaDesde)))
             ->orderBy($orden, $direccion);
     }
 

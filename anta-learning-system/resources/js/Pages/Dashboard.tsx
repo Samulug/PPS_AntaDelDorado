@@ -53,6 +53,8 @@ interface DatoGraficoBarra {
 interface DashboardProps {
     filtros?: {
         zona: string | null;
+        depto?: string | null;
+        rango?: string | null;
     };
     metrics?: {
         total_activos: number;
@@ -68,7 +70,13 @@ interface DashboardProps {
 
 // Paleta sobria y formal inspirada en el prototipo (#2F6F5E, #2F7D4F, #B5651D, #B3372B)
 const PIE_COLORS = ['#2F6F5E', '#3B82F6', '#B3372B', '#B5651D', '#6B7280'];
-
+const RANGOS_FECHAS = [
+    { value: '7', label: 'Últimos 7 días' },
+    { value: '30', label: 'Últimos 30 días' },
+    { value: '90', label: 'Últimos 90 días' },
+    { value: '365', label: 'Este año' },
+    { value: 'todo', label: 'Histórico completo' },
+];
 const ZONAS_DISPONIBLES = [
     'Las Lajitas',
     'Anta',
@@ -77,7 +85,6 @@ const ZONAS_DISPONIBLES = [
 ];
 
 const DEPARTAMENTOS = ['Todos', 'Cosecha', 'Empaque', 'Mantenimiento', 'Logística'];
-const RANGOS_FECHAS = ['7 días', '30 días', '90 días', 'Este año'];
 
 export default function Dashboard({
     filtros = { zona: null },
@@ -93,9 +100,9 @@ export default function Dashboard({
     cursosProblematicos = [],
 }: DashboardProps) {
     const zonaActual = filtros?.zona || '';
+    const deptoFiltro = filtros?.depto || 'Todos';
+    const rangoFecha = filtros?.rango || 'todo';
     const [formatoExport, setFormatoExport] = useState<'Excel' | 'PDF'>('Excel');
-    const [deptoFiltro, setDeptoFiltro] = useState('Todos');
-    const [rangoFecha, setRangoFecha] = useState('30 días');
     const [busquedaTabla, setBusquedaTabla] = useState('');
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     const { can } = useAuth();
@@ -103,6 +110,22 @@ export default function Dashboard({
     const mostrarToast = (texto: string) => {
         setToastMsg(texto);
         setTimeout(() => setToastMsg(null), 2800);
+    };
+
+    const aplicarFiltrosDashboard = (cambios: { zona?: string; depto?: string; rango?: string }) => {
+        const nextZona = cambios.zona !== undefined ? cambios.zona : zonaActual;
+        const nextDepto = cambios.depto !== undefined ? cambios.depto : deptoFiltro;
+        const nextRango = cambios.rango !== undefined ? cambios.rango : rangoFecha;
+
+        router.get(
+            '/dashboard',
+            {
+                zona: nextZona || undefined,
+                depto: nextDepto && nextDepto !== 'Todos' ? nextDepto : undefined,
+                rango: nextRango && nextRango !== 'todo' ? nextRango : undefined,
+            },
+            { preserveState: true, preserveScroll: true }
+        );
     };
 
     // Cambio de Zona Geográfica / Nodo productivo con Inertia
@@ -116,15 +139,14 @@ export default function Dashboard({
 
     // Exportación de reporte según el selector (Excel o PDF)
     const handleExportarReporte = () => {
-        const params = new URLSearchParams(
-            zonaActual ? { zona: zonaActual } : {}
-        ).toString();
+        const params = new URLSearchParams();
+        if (zonaActual) params.set('zona', zonaActual);
+        if (deptoFiltro && deptoFiltro !== 'Todos') params.set('depto', deptoFiltro);
+        if (rangoFecha && rangoFecha !== 'todo') params.set('rango', rangoFecha);
 
-        if (formatoExport === 'Excel') {
-            window.location.href = `/dashboard/export-excel${params ? `?${params}` : ''}`;
-        } else {
-            window.location.href = `/dashboard/export-pdf${params ? `?${params}` : ''}`;
-        }
+        const qs = params.toString();
+        const base = formatoExport === 'Excel' ? '/dashboard/export-excel' : '/dashboard/export-pdf';
+        window.location.href = `${base}${qs ? `?${qs}` : ''}`;
     };
 
     // Filtrado rápido local de la tabla de personal demorado/bloqueado
@@ -201,7 +223,7 @@ export default function Dashboard({
                     Nodo productivo / Planta
                     <select
                         value={zonaActual}
-                        onChange={(e) => handleZonaChange(e.target.value)}
+                        onChange={(e) => aplicarFiltrosDashboard({zona: e.target.value})}
                         className="rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] px-3 py-[9px] text-[15px] font-normal text-[#1F2328] dark:text-[#ECEFEC] focus:border-[#2F6F5E] focus:outline-none focus:ring-3 focus:ring-[#EDF4F1] dark:focus:ring-[#223029]"
                     >
                         <option value="">Todos</option>
@@ -217,7 +239,7 @@ export default function Dashboard({
                     Departamento
                     <select
                         value={deptoFiltro}
-                        onChange={(e) => setDeptoFiltro(e.target.value)}
+                        onChange={(e) => aplicarFiltrosDashboard({depto: e.target.value})}
                         className="rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] px-3 py-[9px] text-[15px] font-normal text-[#1F2328] dark:text-[#ECEFEC] focus:border-[#2F6F5E] focus:outline-none focus:ring-3 focus:ring-[#EDF4F1] dark:focus:ring-[#223029]"
                     >
                         {DEPARTAMENTOS.map((dep) => (
@@ -232,12 +254,12 @@ export default function Dashboard({
                     Rango de fechas
                     <select
                         value={rangoFecha}
-                        onChange={(e) => setRangoFecha(e.target.value)}
-                        className="rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] px-3 py-[9px] text-[15px] font-normal text-[#1F2328] dark:text-[#ECEFEC] focus:border-[#2F6F5E] focus:outline-none focus:ring-3 focus:ring-[#EDF4F1] dark:focus:ring-[#223029]"
+                        onChange={(e) => aplicarFiltrosDashboard({ rango: e.target.value })}
+                        className="rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] px-3.2 py-[9px] text-[15px] font-normal text-[#1F2328] dark:text-[#ECEFEC] focus:border-[#2F6F5E] focus:outline-none focus:ring-3 focus:ring-[#EDF4F1] dark:focus:ring-[#223029]"
                     >
                         {RANGOS_FECHAS.map((r) => (
-                            <option key={r} value={r}>
-                                {r}
+                            <option key={r.value} value={r.value}>
+                                {r.label}
                             </option>
                         ))}
                     </select>

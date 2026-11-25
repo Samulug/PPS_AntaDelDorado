@@ -30,37 +30,14 @@ class DatabaseSeeder extends Seeder
         // 1. Limpiar caché de permisos de Spatie
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
-        // 2. Crear Permisos Granulares para las 6 Vistas del Dashboard
-        $permisos = [
-            'ver dashboard',
-            'descargar reportes',
-            'gestionar colaboradores',
-            'gestionar cuadrillas',
-            'gestionar cursos',
-            'responder tickets',
-            'enviar notificaciones',
-            'gestionar roles',
-        ];
+        $this->call(RolesAndPermissionsSeeder::class);
 
-        foreach ($permisos as $permiso) {
-            Permission::findOrCreate($permiso);
-        }
-
-        // 3. Crear Roles y asignar permisos
-        $roleSuperAdmin = Role::findOrCreate('SuperAdmin');
-        $roleRRHH       = Role::findOrCreate('Lic_RRHH');
-        $roleHyS        = Role::findOrCreate('Lic_HyS');
-        $roleSupervisor = Role::findOrCreate('Supervisor');
-        $roleOperario   = Role::findOrCreate('Operario');
-
-        $roleSuperAdmin->givePermissionTo(Permission::all());
-        $roleRRHH->givePermissionTo([
-            'ver dashboard', 'descargar reportes', 'gestionar colaboradores',
-            'gestionar cuadrillas', 'responder tickets', 'enviar notificaciones'
-        ]);
-        $roleHyS->givePermissionTo([
-            'ver dashboard', 'descargar reportes', 'gestionar cursos', 'gestionar cuadrillas'
-        ]);
+        $roleSuperAdmin = Role::findByName('SuperAdmin', 'web');
+        $roleRRHH       = Role::findByName('Lic_RRHH', 'web');
+        $roleHyS        = Role::findByName('Lic_HyS', 'web');
+        $roleSupervisor = Role::findByName('Supervisor', 'web');
+        $roleOperario   = Role::findByName('Operario', 'web');
+        $permisos       = Permission::pluck('name')->toArray();
 
         $passwordGenerica = Hash::make('12345678');
 
@@ -116,10 +93,9 @@ class DatabaseSeeder extends Seeder
         ]);
         $licRrhh->assignRole($roleRRHH);
 
-        // 5. Poblar los 19 Colaboradores de la Prueba Piloto (Planta Las Lajitas)
         $colaboradoresPiloto = [];
+        $departamentosOperativos = ['Cosecha', 'Empaque', 'Mantenimiento', 'Logística'];
 
-        // Colaborador #1: El Encargado / Supervisor promotor de Planta Las Lajitas
         $supervisorLajitas = User::create([
             'id_microsoft_entra' => 'ms-entra-op-2001',
             'nombre_completo' => 'Roberto Méndez (Encargado Las Lajitas)',
@@ -129,7 +105,7 @@ class DatabaseSeeder extends Seeder
             'password' => $passwordGenerica,
             'rol' => 'Supervisor',
             'permisos_json' => [],
-            'centro_costo' => 'CC-PROD-10',
+            'centro_costo' => 'Cosecha',
             'zona_geografica_establecimient' => 'Las Lajitas',
             'estado_operativo' => 'Activo',
             'fecha_ingreso' => now()->subDays(30)->toDateString(),
@@ -138,7 +114,6 @@ class DatabaseSeeder extends Seeder
         $supervisorLajitas->assignRole($roleSupervisor);
         $colaboradoresPiloto[] = $supervisorLajitas;
 
-        // Colaboradores #2 al #19 (18 Operarios en Las Lajitas)
         $nombresOperarios = [
             'Juan Carlos Mamani', 'Pedro Ignacio Tolaba', 'Miguel Ángel Chocobar',
             'Luis Alberto Salvatierra', 'Carlos Daniel Farfán', 'Jorge Eduardo Arias',
@@ -149,18 +124,18 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($nombresOperarios as $index => $nombre) {
-            $nro = $index + 2; // Del 2 al 19
-            // Simulamos estados variados para probar filtros (los últimos 2 en Vacaciones y Lesionado)
+            $nro = $index + 2;
             $estado = 'Activo';
             if ($nro === 18) $estado = 'Vacaciones';
             if ($nro === 19) $estado = 'Lesionado';
 
-            // Simulamos fechas de ingreso escalonadas para probar desbloqueo día a día
             $diasAntiguedad = match (true) {
-                $nro <= 6  => 15, // Tienen todo desbloqueado
-                $nro <= 12 => 3,  // Van por el día 3
-                default    => 1,  // Recién ingresados hoy (día 1)
+                $nro <= 6  => 45,
+                $nro <= 12 => 15,
+                default    => 3,
             };
+
+            $deptoAsignado = $departamentosOperativos[$index % count($departamentosOperativos)];
 
             $operario = User::create([
                 'id_microsoft_entra' => "ms-entra-op-20" . str_pad((string)$nro, 2, '0', STR_PAD_LEFT),
@@ -171,7 +146,7 @@ class DatabaseSeeder extends Seeder
                 'password' => $passwordGenerica,
                 'rol' => 'Operario',
                 'permisos_json' => [],
-                'centro_costo' => 'CC-PROD-10',
+                'centro_costo' => $deptoAsignado,
                 'zona_geografica_establecimient' => 'Las Lajitas',
                 'estado_operativo' => $estado,
                 'fecha_ingreso' => now()->subDays($diasAntiguedad)->toDateString(),
@@ -181,40 +156,71 @@ class DatabaseSeeder extends Seeder
             $colaboradoresPiloto[] = $operario;
         }
 
-        // Agregamos 2 operarios de otras zonas geográficas (Anta y Laguna Verde) para probar filtros
-        $opAnta = User::create([
-            'nombre_completo' => 'Lucas Díaz (Establecimiento Anta)',
-            'dni' => 40111222,
-            'legajo' => 3001,
-            'email' => 'lucas.anta@antadeldorado.com',
-            'password' => $passwordGenerica,
-            'rol' => 'Operario',
-            'centro_costo' => 'CC-PROD-20',
-            'zona_geografica_establecimient' => 'Anta',
-            'estado_operativo' => 'Activo',
-            'fecha_ingreso' => now()->subDays(10)->toDateString(),
-        ]);
-        $opAnta->assignRole($roleOperario);
+        // Operarios adicionales en otros nodos, departamentos y fechas escalonadas
+        $extrasNodos = [
+            ['nombre' => 'Lucas Díaz', 'dni' => 40111222, 'legajo' => 3001, 'email' => 'lucas.anta@antadeldorado.com', 'nodo' => 'Anta', 'depto' => 'Cosecha', 'dias' => 5],
+            ['nombre' => 'Martín Ezequiel Sosa', 'dni' => 40222333, 'legajo' => 3002, 'email' => 'martin.mollinedo@antadeldorado.com', 'nodo' => 'Coronel Mollinedo', 'depto' => 'Mantenimiento', 'dias' => 22],
+            ['nombre' => 'Federico Nahuel Quiroga', 'dni' => 40333444, 'legajo' => 3003, 'email' => 'federico.laguna@antadeldorado.com', 'nodo' => 'Laguna Verde', 'depto' => 'Logística', 'dias' => 65],
+            ['nombre' => 'Sebastián Andrés Romero', 'dni' => 40444555, 'legajo' => 3004, 'email' => 'sebastian.anta@antadeldorado.com', 'nodo' => 'Anta', 'depto' => 'Empaque', 'dias' => 140],
+        ];
 
-        // 6. Crear Cuadrillas de Entrenamiento Preventivo
+        $colaboradoresOtrasZonas = [];
+        foreach ($extrasNodos as $idx => $ex) {
+            $opExtra = User::create([
+                'nombre_completo' => $ex['nombre'],
+                'dni' => $ex['dni'],
+                'legajo' => $ex['legajo'],
+                'email' => $ex['email'],
+                'password' => $passwordGenerica,
+                'rol' => 'Operario',
+                'permisos_json' => [],
+                'centro_costo' => $ex['depto'],
+                'zona_geografica_establecimient' => $ex['nodo'],
+                'estado_operativo' => 'Activo',
+                'fecha_ingreso' => now()->subDays($ex['dias'])->toDateString(),
+                'fcm_token' => 'fcm_fake_token_extra_' . $ex['legajo'],
+            ]);
+            $opExtra->assignRole($roleOperario);
+            $colaboradoresOtrasZonas[] = $opExtra;
+        }
+
+        // 6. Crear Cuadrillas Activas (estado = 'Activa' en texto para coincidir con el controlador)
         $cuadrillaPoda = Cuadrilla::create([
             'nombre_cuadrilla' => 'Cuadrilla 1 - Poda Intensiva Lote Norte',
             'labor_asociada' => 'Poda intensiva y uso de guantes anticorte y gafas',
-            'fecha_creacion' => now()->subDays(2)->toDateString(),
-            'estado' => true,
+            'fecha_creacion' => now()->subDays(10)->toDateString(),
+            'estado' => 'Activa',
         ]);
 
         $cuadrillaFumigacion = Cuadrilla::create([
             'nombre_cuadrilla' => 'Cuadrilla 2 - Fumigación Preventiva',
             'labor_asociada' => 'Manejo de agroquímicos y máscaras de filtro',
-            'fecha_creacion' => now()->toDateString(),
-            'estado' => true,
+            'fecha_creacion' => now()->subDays(5)->toDateString(),
+            'estado' => 'Activa',
         ]);
 
-        // Asignar los primeros 5 colaboradores de Las Lajitas a la Cuadrilla 1
+        $cuadrillaLogisticaAnta = Cuadrilla::create([
+            'nombre_cuadrilla' => 'Cuadrilla 3 - Logística y Carga Anta',
+            'labor_asociada' => 'Movimiento de cargas y seguridad vial interna',
+            'fecha_creacion' => now()->subDays(20)->toDateString(),
+            'estado' => 'Activa',
+        ]);
+
         for ($i = 0; $i < 5; $i++) {
             $cuadrillaPoda->colaboradores()->attach($colaboradoresPiloto[$i]->id, [
-                'fecha_asignacion' => now()->subDays(2)->toDateString(),
+                'fecha_asignacion' => now()->subDays(10)->toDateString(),
+            ]);
+        }
+
+        for ($i = 5; $i < 9; $i++) {
+            $cuadrillaFumigacion->colaboradores()->attach($colaboradoresPiloto[$i]->id, [
+                'fecha_asignacion' => now()->subDays(5)->toDateString(),
+            ]);
+        }
+
+        foreach ($colaboradoresOtrasZonas as $opExtra) {
+            $cuadrillaLogisticaAnta->colaboradores()->attach($opExtra->id, [
+                'fecha_asignacion' => now()->subDays(20)->toDateString(),
             ]);
         }
 
@@ -436,6 +442,39 @@ class DatabaseSeeder extends Seeder
             }
         }
 
+        // Progresos de Cuadrilla 2 (Empaque / Mantenimiento - Las Lajitas)
+        for ($i = 5; $i < 9; $i++) {
+            $progC2 = ProgresoCurso::create([
+                'id_usuario'        => $colaboradoresPiloto[$i]->id,
+                'id_curso'          => $cursoApp->id_curso,
+                'id_cuadrilla'      => $cuadrillaFumigacion->id_cuadrilla,
+                'fecha_inicio'      => now()->subDays(18)->toDateString(),
+                'porcentaje_avance' => $i === 8 ? 30 : 65,
+                'ultima_visita'     => now()->subDays(18),
+                'estado'            => $i === 8 ? 'Bloqueado' : 'En_Curso',
+            ]);
+            $progC2->timestamps = false;
+            $progC2->update(['updated_at' => now()->subDays(18)]);
+        }
+
+        // Progresos de Cuadrilla 3 (Otros nodos y fechas antiguas: 2, 22, 65 y 135 días)
+        $diasEscalones = [2, 22, 65, 135];
+        foreach ($colaboradoresOtrasZonas as $idx => $opExtra) {
+            $diasAtras = $diasEscalones[$idx] ?? 10;
+            $bloqueadoExtra = ($idx % 2 === 1); // Martín (Mollinedo, 22d) y Sebastián (Anta, 135d) bloqueados
+            $progExtra = ProgresoCurso::create([
+                'id_usuario'        => $opExtra->id,
+                'id_curso'          => $cursoMaquinaria->id_curso,
+                'id_cuadrilla'      => $cuadrillaLogisticaAnta->id_cuadrilla,
+                'fecha_inicio'      => now()->subDays($diasAtras)->toDateString(),
+                'porcentaje_avance' => $bloqueadoExtra ? 40 : 60,
+                'ultima_visita'     => now()->subDays($diasAtras),
+                'estado'            => $bloqueadoExtra ? 'Bloqueado' : 'En_Curso',
+            ]);
+            $progExtra->timestamps = false;
+            $progExtra->update(['updated_at' => now()->subDays($diasAtras)]);
+        }
+
 // 10. Poblar Bandeja de Tickets (Nuevo Sistema de Chat)
         // Ticket 1: Resuelto (Chat completo)
         $ticket1 = TicketConsulta::create([
@@ -476,25 +515,6 @@ class DatabaseSeeder extends Seeder
             'cuerpo_mensaje' => 'Se me bloqueó el cuestionario después del tercer intento, ¿me lo habilitan?',
         ]);
 
-        // 11. Poblar Historial de Notificaciones Duales (Push + Correo)
-        NotificacionEmitida::create([
-            'id_usuario' => $belec->id,
-            'titulo' => 'Entrenamiento Preventivo Asignado: Cuadrilla Poda',
-            'mensaje' => 'Se ha habilitado la batería de cápsulas sobre uso de guantes anticorte y gafas. Tienen 7 días para completarla antes de ingresar al lote.',
-            'fecha_publicacion' => now()->subDays(2)->toDateString(),
-            'enviado_push' => true,
-            'enviado_email' => 'Enviado (5 destinatarios)',
-            'segmento_destino' => 'Cuadrilla 1 - Las Lajitas',
-        ]);
-
-        NotificacionEmitida::create([
-            'id_usuario' => $belec->id,
-            'titulo' => 'Alerta Climática: Suspensión temporal en lote externo',
-            'mensaje' => 'Por alerta de tormenta severa y granizo, el personal de campo debe replegarse a la base cubierta de Planta Las Lajitas.',
-            'fecha_publicacion' => now()->toDateString(),
-            'enviado_push' => true,
-            'enviado_email' => 'Enviado (19 destinatarios)',
-            'segmento_destino' => 'Nodo: Las Lajitas',
-        ]);
+        $this->call(NotificacionesSeeder::class);
     }
 }

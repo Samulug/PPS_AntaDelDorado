@@ -19,82 +19,109 @@ use Maatwebsite\Excel\Facades\Excel;
 #[Middleware('permission:ver_metricas')]
 class DashboardController extends Controller
 {
+private function resolveFechaDesde(?string $rango)
+    {
+        return match ($rango) {
+            '7'   => now()->subDays(7),
+            '30'  => now()->subDays(30),
+            '90'  => now()->subDays(90),
+            '365' => now()->subYear(),
+            default => null,
+        };
+    }
+
     public function index(Request $request): Response
     {
-        // Filtro Global
-        $zona = $request->input('zona', null);
+        $zona  = $request->input('zona', null);
+        $depto = $request->input('depto', null);
+        $rango = $request->input('rango', 'todo');
+        $fechaDesde = $this->resolveFechaDesde($rango);
 
-        // operarios activos filtrando por zona si existe
+        $filtrarProgreso = function ($query) use ($zona, $depto, $fechaDesde) {
+            $query->when($zona || $depto, function ($q) use ($zona, $depto) {
+                $q->whereHas('usuario', function ($u) use ($zona, $depto) {
+                    $u->when($zona, fn($sq) => $sq->where('zona_geografica_establecimient', $zona))
+                      ->when($depto, fn($sq) => $sq->where('centro_costo', $depto));
+                });
+            })->when($fechaDesde, fn($q) => $q->where('updated_at', '>=', $fechaDesde));
+        };
+
         $totalActivos = User::where('rol', 'Operario')
             ->where('estado_operativo', 'Activo')
             ->when($zona, fn($q) => $q->where('zona_geografica_establecimient', $zona))
+            ->when($depto, fn($q) => $q->where('centro_costo', $depto))
             ->count();
 
-        // % de cumplimiento global promediando la tabla de progresos
-        $promedioCumplimiento = ProgresoCurso::when($zona, fn($q) => 
-                $q->whereHas('usuario', fn($u) => $u->where('zona_geografica_establecimient', $zona))
-            )->avg('porcentaje_avance') ?? 0;
+        $promedioCumplimiento = ProgresoCurso::tap($filtrarProgreso)
+            ->avg('porcentaje_avance') ?? 0;
 
-        // operarios que reprobaron 3 veces o se les venció el curso
         $alertasBloqueados = ProgresoCurso::whereIn('estado', ['Bloqueado', 'Vencido'])
-            ->when($zona, fn($q) => 
-                $q->whereHas('usuario', fn($u) => $u->where('zona_geografica_establecimient', $zona))
-            )->count();
+            ->tap($filtrarProgreso)
+            ->count();
 
-        // tickets enviados por la App Móvil sin responder
-        $ticketsPendientes = TicketConsulta::where('estado_ticket', 'Pendiente')
-            ->when($zona, fn($q) => 
-                $q->whereHas('colaborador', fn($u) => $u->where('zona_geografica_establecimient', $zona))
-            )->count();
+        $ticketsPendientes = TicketConsulta::whereIn('estado_ticket', ['Abierto', 'En Curso'])
+            ->when($zona || $depto, function ($q) use ($zona, $depto) {
+                $q->whereHas('colaborador', function ($u) use ($zona, $depto) {
+                    $u->when($zona, fn($sq) => $sq->where('zona_geografica_establecimient', $zona))
+                      ->when($depto, fn($sq) => $sq->where('centro_costo', $depto));
+                });
+            })
+            ->when($fechaDesde, fn($q) => $q->where('created_at', '>=', $fechaDesde))
+            ->count();
 
         $metrics = [
-            'total_activos'        => $totalActivos,
-            'indice_cumplimiento'  => round($promedioCumplimiento, 1),
-            'alertas_bloqueados'   => $alertasBloqueados,
-            'tickets_pendientes'   => $ticketsPendientes,
+            'total_activos'       => $totalActivos,
+            'indice_cumplimiento' => round($promedioCumplimiento, 1),
+            'alertas_bloqueados'  => $alertasBloqueados,
+            'tickets_pendientes'  => $ticketsPendientes,
         ];
 
-        // estados de los cursos
         $estadosCursos = ProgresoCurso::select('estado', DB::raw('count(*) as total'))
-            ->when($zona, fn($q) => 
-                $q->whereHas('usuario', fn($u) => $u->where('zona_geografica_establecimient', $zona))
-            )
+            ->tap($filtrarProgreso)
             ->groupBy('estado')
             ->get()
             ->map(fn ($item) => [
-                'name'  => $item->estado, //"Completado", "En_Curso", "Bloqueado"
+                'name'  => $item->estado,
                 'value' => (int) $item->total,
             ]);
 
-        // avance por cuadrilla
-        // withAvg: traer directamente el promedio de las relaciones
-        $avancePorCuadrilla = Cuadrilla::where('estado', true)
-            ->withAvg('progresosCursos', 'porcentaje_avance')
-            ->take(5) // mostramos top 5 de cuadrillas activas
+        $avancePorCuadrilla = Cuadrilla::where('estado', 'Activa')
+            ->when($zona || $depto, function ($q) use ($zona, $depto) {
+                $q->whereHas('colaboradores', function ($u) use ($zona, $depto) {
+                    $u->when($zona, fn($sq) => $sq->where('zona_geografica_establecimient', $zona))
+                      ->when($depto, fn($sq) => $sq->where('centro_costo', $depto));
+                });
+            })
+            ->with([
+                'progresosCursos' => $filtrarProgreso,
+                'colaboradores.progresos' => $filtrarProgreso,
+            ])
+            ->take(5)
             ->get()
-            ->map(fn ($cuadrilla) => [
-                'name' => $cuadrilla->nombre_cuadrilla,
-                'avance' => round($cuadrilla->progresos_cursos_avg_porcentaje_avance ?? 0, 1)
-            ]);
+            ->map(function ($cuadrilla) {
+                $avgDirecto = $cuadrilla->progresosCursos->avg('porcentaje_avance');
+                if ($avgDirecto === null) {
+                    $progresosColabs = $cuadrilla->colaboradores->flatMap->progresos;
+                    $avgDirecto = $progresosColabs->avg('porcentaje_avance');
+                }
+                return [
+                    'name'   => $cuadrilla->nombre_cuadrilla,
+                    'avance' => round($avgDirecto ?? 0, 1),
+                ];
+            });
 
-        // top 5 operarios bloqueados
-        //eager loading: solo los datos necesarios usando (with)
-        // top 5 operarios bloqueados
         $colaboradoresBloqueados = ProgresoCurso::with([
-                // Corregido: Solicitamos 'id' porque así se llama la PK en la tabla users
-                'usuario:id,nombre_completo,legajo,zona_geografica_establecimient',
-                'curso:id_curso,nombre'
+                'usuario:id,nombre_completo,legajo,zona_geografica_establecimient,centro_costo',
+                'curso:id_curso,nombre',
             ])
             ->where('estado', 'Bloqueado')
-            ->when($zona, fn($q) => 
-                $q->whereHas('usuario', fn($u) => $u->where('zona_geografica_establecimient', $zona))
-            )
+            ->tap($filtrarProgreso)
             ->latest('updated_at')
             ->take(5)
             ->get();
 
-        $cursosProblematicos = Curso::withCount(['progresos as bloqueos_count' => fn($q) => 
-                $q->where('estado', 'Bloqueado')
+        $cursosProblematicos = Curso::withCount([
+                'progresos as bloqueos_count' => fn($q) => $q->where('estado', 'Bloqueado')->tap($filtrarProgreso),
             ])
             ->orderByDesc('bloqueos_count')
             ->take(3)
@@ -102,11 +129,11 @@ class DashboardController extends Controller
             ->map(fn ($curso) => [
                 'id_curso' => $curso->id_curso,
                 'nombre'   => $curso->nombre,
-                'bloqueos' => $curso->bloqueos_count
+                'bloqueos' => $curso->bloqueos_count,
             ]);
 
         return Inertia::render('Dashboard', [
-            'filtros'                 => ['zona' => $zona],
+            'filtros'                 => ['zona' => $zona, 'depto' => $depto, 'rango' => $rango],
             'metrics'                 => $metrics,
             'estadosCursos'           => $estadosCursos,
             'avancePorCuadrilla'      => $avancePorCuadrilla,
@@ -115,24 +142,37 @@ class DashboardController extends Controller
         ]);
     }
 
-    /**
-     * Genera y descarga (o previsualiza) el Reporte Ejecutivo en PDF del Dashboard (A4 Horizontal)
-     */
     public function exportPdf(Request $request)
     {
-        $zona = $request->input('zona');
+        $zona  = $request->input('zona');
+        $depto = $request->input('depto');
+        $rango = $request->input('rango', 'todo');
+        $fechaDesde = $this->resolveFechaDesde($rango);
 
-        // Reutilizamos las métricas filtradas por zona
-        $usuariosActivosQuery = User::where('rol', 'Operario')
+        $rangoLabels = [
+            '7'    => 'Últimos 7 días',
+            '30'   => 'Últimos 30 días',
+            '90'   => 'Últimos 90 días',
+            '365'  => 'Último año',
+            'todo' => 'Histórico completo',
+        ];
+
+        $filtrarProgreso = function ($query) use ($zona, $depto, $fechaDesde) {
+            $query->when($zona || $depto, function ($q) use ($zona, $depto) {
+                $q->whereHas('usuario', function ($u) use ($zona, $depto) {
+                    $u->when($zona, fn($sq) => $sq->where('zona_geografica_establecimient', $zona))
+                      ->when($depto, fn($sq) => $sq->where('centro_costo', $depto));
+                });
+            })->when($fechaDesde, fn($q) => $q->where('updated_at', '>=', $fechaDesde));
+        };
+
+        $totalActivos = User::where('rol', 'Operario')
             ->where('estado_operativo', 'Activo')
-            ->when($zona, fn($q) => $q->where('zona_geografica_establecimient', $zona));
+            ->when($zona, fn($q) => $q->where('zona_geografica_establecimient', $zona))
+            ->when($depto, fn($q) => $q->where('centro_costo', $depto))
+            ->count();
 
-        $totalActivos = $usuariosActivosQuery->count();
-
-        $progresosQuery = ProgresoCurso::with(['usuario', 'curso'])
-            ->when($zona, function ($q) use ($zona) {
-                $q->whereHas('usuario', fn($u) => $u->where('zona_geografica_establecimient', $zona));
-            });
+        $progresosQuery = ProgresoCurso::with(['usuario', 'curso'])->tap($filtrarProgreso);
 
         $indiceCumplimiento = round((clone $progresosQuery)->avg('porcentaje_avance') ?? 0);
 
@@ -142,26 +182,53 @@ class DashboardController extends Controller
             ->get();
 
         $alertasBloqueados = (clone $progresosQuery)->whereIn('estado', ['Bloqueado', 'Vencido'])->count();
-        $ticketsPendientes = TicketConsulta::where('estado_ticket', 'Pendiente')->count();
+        $ticketsPendientes = TicketConsulta::where('estado_ticket', 'Pendiente')
+            ->when($zona || $depto, function ($q) use ($zona, $depto) {
+                $q->whereHas('colaborador', function ($u) use ($zona, $depto) {
+                    $u->when($zona, fn($sq) => $sq->where('zona_geografica_establecimient', $zona))
+                      ->when($depto, fn($sq) => $sq->where('centro_costo', $depto));
+                });
+            })
+            ->when($fechaDesde, fn($q) => $q->where('created_at', '>=', $fechaDesde))
+            ->count();
 
         $cursosProblematicos = Curso::withCount([
-            'progresos as bloqueos' => function ($q) use ($zona) {
-                $q->where('estado', 'Bloqueado')
-                  ->when($zona, fn($sub) => $sub->whereHas('usuario', fn($u) => $u->where('zona_geografica_establecimient', $zona)));
-            }
+            'progresos as bloqueos' => fn($q) => $q->where('estado', 'Bloqueado')->tap($filtrarProgreso),
         ])->orderByDesc('bloqueos')->take(8)->get()->map(fn($c) => [
             'id_curso' => $c->id_curso,
             'nombre'   => $c->nombre,
             'bloqueos' => $c->bloqueos,
         ]);
 
-        $avancePorCuadrilla = Cuadrilla::with('progresosCursos')->get()->map(fn($cuad) => [
-            'name'   => $cuad->nombre_cuadrilla,
-            'avance' => round($cuad->progresosCursos->avg('porcentaje_avance') ?? 0),
-        ]);
+        $avancePorCuadrilla = Cuadrilla::where('estado', 'Activa')
+            ->when($zona || $depto, function ($q) use ($zona, $depto) {
+                $q->whereHas('colaboradores', function ($u) use ($zona, $depto) {
+                    $u->when($zona, fn($sq) => $sq->where('zona_geografica_establecimient', $zona))
+                      ->when($depto, fn($sq) => $sq->where('centro_costo', $depto));
+                });
+            })
+            ->with([
+                'progresosCursos' => $filtrarProgreso,
+                'colaboradores.progresos' => $filtrarProgreso,
+            ])
+            ->take(5)
+            ->get()
+            ->map(function ($cuadrilla) {
+                $avgDirecto = $cuadrilla->progresosCursos->avg('porcentaje_avance');
+                if ($avgDirecto === null) {
+                    $progresosColabs = $cuadrilla->colaboradores->flatMap->progresos;
+                    $avgDirecto = $progresosColabs->avg('porcentaje_avance');
+                }
+                return [
+                    'name'   => $cuadrilla->nombre_cuadrilla,
+                    'avance' => round($avgDirecto ?? 0, 1),
+                ];
+            });
 
         $pdf = Pdf::loadView('reportes.dashboard-pdf', [
             'zona'                    => $zona,
+            'depto'                   => $depto,
+            'rangoLabel'              => $rangoLabels[$rango] ?? 'Histórico completo',
             'fechaGeneracion'         => now()->format('d/m/Y H:i'),
             'emitidoPor'              => $request->user()?->nombre_completo ?? 'RRHH Admin',
             'metrics'                 => [
@@ -173,19 +240,18 @@ class DashboardController extends Controller
             'colaboradoresBloqueados' => $colaboradoresBloqueados,
             'cursosProblematicos'     => $cursosProblematicos,
             'avancePorCuadrilla'      => $avancePorCuadrilla,
-        ])->setPaper('a4', 'landscape'); // Orientación A4 horizontal como pide la guía
+        ])->setPaper('a4', 'landscape');
 
         $sufijoZona = $zona ? '-' . \Illuminate\Support\Str::slug($zona) : '-global';
         return $pdf->download("reporte-inducciones{$sufijoZona}-" . now()->format('Ymd') . ".pdf");
     }
 
-    /**
-     * Descarga el Excel desde el Dashboard respetando el filtro de Zona Geográfica
-     */
     public function exportExcel(Request $request)
     {
         $filtros = [
             'zona'      => $request->input('zona', ''),
+            'depto'     => $request->input('depto', ''),
+            'rango'     => $request->input('rango', 'todo'),
             'orden'     => 'nombre_completo',
             'direccion' => 'asc',
         ];
