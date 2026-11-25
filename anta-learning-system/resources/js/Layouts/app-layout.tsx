@@ -108,9 +108,9 @@ export default function AppLayout({
         },
         {
             name: 'Consultas',
-            href: '/tickets',
+            href: '/consultas',
             icon: MessageSquare,
-            current: url.startsWith('/tickets'),
+            current: url.startsWith('/consultas'),
             badge: auth?.ticketsPendientesCount || undefined,
             permission: 'listar_tickets',
         },

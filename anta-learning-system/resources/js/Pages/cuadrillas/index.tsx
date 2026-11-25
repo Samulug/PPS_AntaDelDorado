@@ -21,6 +21,7 @@ import {
     X,
     Save,
 } from 'lucide-react';
+import { useSupabaseRealtime } from '@/hooks/use-supabase-realtime';
 
 interface Colaborador {
     id: number;
@@ -80,6 +81,11 @@ export default function CuadrillasIndex({
     users = [],
     cursosDisponibles = [],
 }: Props) {
+    useSupabaseRealtime({
+        channelName: 'sync-cuadrillas',
+        tables: ['cuadrilla', 'colaborador_cuadrilla'],
+        onlyProps: ['cuadrillas'],
+    });
     const { flash } = usePage<any>().props;
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     const {can} = useAuth();

@@ -57,13 +57,23 @@ interface AuditItem {
     } | null;
 }
 
+interface MensajeTicketResumen {
+    id_mensaje: number;
+    id_ticket: number;
+    id_emisor_usuario: number;
+    cuerpo_mensaje: string;
+    created_at: string;
+}
+
 interface TicketAuditado {
     id_ticket: number;
-    mensaje_consulta: string;
-    respuesta_admin: string;
+    categoria_consulta: string;
+    asunto_resumen: string;
     estado_ticket: string;
     calificacion_respuesta: number | null;
+    total_mensajes?: number;
     updated_at: string;
+    mensajes?: MensajeTicketResumen[];
     colaborador?: {
         id: number;
         nombre_completo: string;
@@ -73,7 +83,7 @@ interface TicketAuditado {
     curso?: {
         id_curso: number;
         nombre: string;
-    };
+    } | null;
 }
 
 interface NotificacionLog {
@@ -219,10 +229,10 @@ export default function ProfileEdit({
 
     const getBadgeColor = (estado: string) => {
         const est = estado.toLowerCase();
-        if (est.includes('activo') || est.includes('activa') || est.includes('respondido')) {
+        if (est.includes('activo') || est.includes('activa') || est.includes('resuelto') || est.includes('cerrado')) {
             return 'bg-[#2F7D4F]/12 text-[#2F7D4F] dark:bg-[#6CC28A]/15 dark:text-[#6CC28A]';
         }
-        if (est.includes('borrador') || est.includes('taller') || est.includes('pendiente')) {
+        if (est.includes('borrador') || est.includes('taller') || est.includes('pendiente') || est.includes('curso') || est.includes('abierto')) {
             return 'bg-[#B5651D]/12 text-[#B5651D] dark:bg-[#E3A15A]/15 dark:text-[#E3A15A]';
         }
         return 'bg-[#B3372B]/12 text-[#B3372B] dark:bg-[#EE8274]/15 dark:text-[#EE8274]';
@@ -639,23 +649,61 @@ export default function ProfileEdit({
                                     </thead>
                                     <tbody className="divide-y divide-[#E9E9E7] dark:divide-[#2A302B]">
                                         {metricasSoporte.ultimos_tickets.length > 0 ? (
-                                            metricasSoporte.ultimos_tickets.map((t) => (
-                                                <tr key={t.id_ticket} className="hover:bg-[#F7F7F6] dark:hover:bg-[#141714]">
-                                                    <td className="py-3 px-4">
-                                                        <b className="block whitespace-nowrap">{t.colaborador?.nombre_completo || 'Operario'}</b>
-                                                        <small className="text-[#6B7280] whitespace-nowrap">{t.curso?.nombre || 'Consulta General'}</small>
-                                                    </td>
-                                                    <td className="py-3 px-4 min-w-[200px]" title={t.mensaje_consulta}>
-                                                        {t.mensaje_consulta}
-                                                    </td>
-                                                    <td className="py-3 px-4 min-w-[200px] text-[#6B7280]" title={t.respuesta_admin}>
-                                                        {t.respuesta_admin || '—'}
-                                                    </td>
-                                                    <td className="py-3 px-4 text-right font-semibold whitespace-nowrap">
-                                                        {t.calificacion_respuesta ? `${t.calificacion_respuesta} ★` : 'Pendiente'}
-                                                    </td>
-                                                </tr>
-                                            ))
+                                            metricasSoporte.ultimos_tickets.map((t) => {
+                                                // Como mensajes viene ordenado DESC desde ProfileController:
+                                                // - El último elemento es la consulta inicial del operario
+                                                // - El primero emitido por el admin actual es tu última respuesta
+                                                const consultaInicial = t.mensajes?.[t.mensajes.length - 1]?.cuerpo_mensaje;
+                                                const tuUltimaRespuesta = t.mensajes?.find(
+                                                    (m) => m.id_emisor_usuario === perfilAdmin.id
+                                                )?.cuerpo_mensaje;
+
+                                                return (
+                                                    <tr key={t.id_ticket} className="hover:bg-[#F7F7F6] dark:hover:bg-[#141714]">
+                                                        {/* Columna 1: Colaborador y Curso/Área */}
+                                                        <td className="py-3 px-4">
+                                                            <b className="block whitespace-nowrap">
+                                                                {t.colaborador?.nombre_completo || 'Operario'}
+                                                            </b>
+                                                            <small className="text-[#6B7280] whitespace-nowrap">
+                                                                {t.curso?.nombre || t.categoria_consulta || 'Consulta General'}
+                                                            </small>
+                                                        </td>
+
+                                                        {/* Columna 2: Asunto + extracto de la consulta inicial */}
+                                                        <td className="py-3 px-4 min-w-[220px]" title={consultaInicial || t.asunto_resumen}>
+                                                            <b className="block text-[13.5px] text-[#1F2328] dark:text-[#ECEFEC]">
+                                                                {t.asunto_resumen}
+                                                            </b>
+                                                            <small className="text-[#6B7280] line-clamp-1">
+                                                                {consultaInicial || 'Sin mensajes registrados'}
+                                                            </small>
+                                                        </td>
+
+                                                        {/* Columna 3: Tu última respuesta en el chat + cantidad de mensajes */}
+                                                        <td className="py-3 px-4 min-w-[220px] text-[#6B7280]" title={tuUltimaRespuesta}>
+                                                            <span className="line-clamp-2">
+                                                                {tuUltimaRespuesta || 'Sin respuesta enviada aún'}
+                                                            </span>
+                                                            {typeof t.total_mensajes === 'number' && (
+                                                                <small className="block text-[11.5px] text-[#2F6F5E] dark:text-[#6FBFA5] mt-0.5">
+                                                                    {t.total_mensajes} {t.total_mensajes === 1 ? 'mensaje' : 'mensajes'} en el hilo
+                                                                </small>
+                                                            )}
+                                                        </td>
+
+                                                        {/* Columna 4: Estado del ticket y Calificación */}
+                                                        <td className="py-3 px-4 text-right whitespace-nowrap">
+                                                            <span className={`inline-block px-2 py-0.5 rounded-full text-[11.5px] font-semibold mb-1 ${getBadgeColor(t.estado_ticket)}`}>
+                                                                {t.estado_ticket}
+                                                            </span>
+                                                            <div className="font-semibold text-[13px]">
+                                                                {t.calificacion_respuesta ? `${t.calificacion_respuesta} ★` : 'Sin calificar'}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
                                         ) : (
                                             <tr>
                                                 <td colSpan={4} className="py-6 px-4 text-center text-[#6B7280]">

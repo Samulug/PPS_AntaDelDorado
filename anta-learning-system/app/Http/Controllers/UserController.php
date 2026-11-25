@@ -30,15 +30,24 @@ class UserController extends Controller
 
         if ($request->filled('search')) {
             $search = trim($request->search);
-            $query->where(function ($q) use ($search) {
-                $q->where('nombre_completo', 'ilike', "%{$search}%")
-                  ->orWhere('dni', 'like', "%{$search}%")
-                  ->orWhere('legajo', 'like', "%{$search}%")
-                  ->orWhere('email', 'ilike', "%{$search}%")
-                  ->orWhere('rol', 'ilike', "%{$search}%")
-                  ->orWhere('zona_geografica_establecimient', 'ilike', "%{$search}%")
-                  ->orWhere('centro_costo', 'ilike', "%{$search}%")
-                  ->orWhere('estado_operativo', 'ilike', "%{$search}%");
+            $isPgsql = \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'pgsql';
+            $likeOp = $isPgsql ? 'ilike' : 'like';
+
+            $query->where(function ($q) use ($search, $likeOp, $isPgsql) {
+                $q->where('nombre_completo', $likeOp, "%{$search}%")
+                ->orWhere('email', $likeOp, "%{$search}%")
+                ->orWhere('rol', $likeOp, "%{$search}%")
+                ->orWhere('zona_geografica_establecimient', $likeOp, "%{$search}%")
+                ->orWhere('centro_costo', $likeOp, "%{$search}%")
+                ->orWhere('estado_operativo', $likeOp, "%{$search}%");
+
+                if ($isPgsql) {
+                    $q->orWhereRaw('CAST(dni AS TEXT) ILIKE ?', ["%{$search}%"])
+                    ->orWhereRaw('CAST(legajo AS TEXT) ILIKE ?', ["%{$search}%"]);
+                } else {
+                    $q->orWhere('dni', 'like', "%{$search}%")
+                    ->orWhere('legajo', 'like', "%{$search}%");
+                }
             });
         }
 

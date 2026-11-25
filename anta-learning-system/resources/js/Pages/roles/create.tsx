@@ -43,7 +43,9 @@ const GRUPOS_PERMISOS = [
         modulo: '5. Bandeja de Consultas (Tickets)',
         permisos: [
             { key: 'listar_tickets', label: 'Ver bandeja de dudas de operarios' },
-            { key: 'responder_tickets', label: 'Responder consultas (RRHH)' },
+            { key: 'responder_tickets', label: 'Responder consultas y notas internas' },
+            { key: 'derivar_tickets', label: 'Derivar tickets propios o sin asignar a otra área' },
+            { key: 'reasignar_tickets_ajenos', label: 'Tomar o reasignar tickets atendidos por otro administrador' },
         ],
     },
     {

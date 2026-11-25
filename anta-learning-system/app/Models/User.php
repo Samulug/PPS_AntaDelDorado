@@ -30,6 +30,7 @@ class User extends Authenticatable
         'fecha_ingreso',
         'fcm_token',
         'foto',
+        'disponible_soporte',
     ];
 
     protected $hidden = [
@@ -46,6 +47,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'permisos_json' => 'array',
             'fecha_ingreso' => 'date',
+            'disponible_soporte' => 'boolean',
         ];
     }
 
@@ -75,6 +77,11 @@ class User extends Authenticatable
     public function ticketsRespondidos()
     {
         return $this->hasMany(TicketConsulta::class, 'id_admin_respondiente', 'id');
+    }
+
+    public function ticketsAsignados()
+    {
+        return $this->hasMany(TicketConsulta::class, 'id_admin_asignado', 'id');
     }
 
     public function auditorias()

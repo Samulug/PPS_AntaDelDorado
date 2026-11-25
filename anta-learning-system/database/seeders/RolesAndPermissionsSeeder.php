@@ -48,12 +48,18 @@ class RolesAndPermissionsSeeder extends Seeder
             // Módulo 6: Notificaciones Push / Email
             'listar_notificaciones',
             'enviar_notificacion_push',
-
+            
             // Módulo 7: Seguridad y Roles
             'listar_roles_admins',
             'crear_rol',
             'editar_rol',
             'asignar_permisos',
+
+            // Módulo 8: Tickets y Consultas
+            'listar_tickets', 
+            'responder_tickets', 
+            'derivar_tickets',
+            'reasignar_tickets_ajenos'
         ];
 
         foreach ($permisos as $permiso) {
@@ -89,6 +95,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'responder_tickets',
             'listar_notificaciones',
             'enviar_notificacion_push',
+            'listar_tickets', 
+            'responder_tickets', 
+            'derivar_tickets',
         ]);
 
         // Lic_HyS: Dominio de cursos, cuadrillas preventivas, métricas y lectura de colaboradores
@@ -104,6 +113,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'editar_curso',
             'eliminar_curso',
             'previsualizar_curso',
+            'listar_tickets', 
+            'responder_tickets', 
+            'derivar_tickets',
         ]);
 
         // 5. Creación de los 2 SuperAdmins (Desarrollador y Belec Gainza)

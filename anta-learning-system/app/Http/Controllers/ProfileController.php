@@ -6,6 +6,7 @@ use App\Http\Requests\ProfileUpdateRequest;
 use App\Models\AuditAdmin;
 use App\Models\NotificacionEmitida;
 use App\Models\TicketConsulta;
+use App\Models\MensajeTicket;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -62,19 +63,41 @@ class ProfileController extends Controller
             ->get();
 
         // 4. Métricas de Soporte (Tickets Auditados respondidos por este admin)
-        $ticketsRespondidosQuery = TicketConsulta::where('id_admin_respondiente', $user->id)
-            ->where('estado_ticket', 'Respondido');
+        $ticketsResueltosQuery = TicketConsulta::where('id_admin_asignado', $user->id)
+            ->whereIn('estado_ticket', ['Resuelto', 'Cerrado']);
 
-        $totalTicketsRespondidos = (clone $ticketsRespondidosQuery)->count();
-        $calificacionPromedio = (clone $ticketsRespondidosQuery)
+        $totalTicketsRespondidos = (clone $ticketsResueltosQuery)->count();
+        $ticketsEnCurso = TicketConsulta::where('id_admin_asignado', $user->id)
+            ->whereIn('estado_ticket', ['Abierto', 'En Curso'])
+            ->count();
+
+        $totalMensajesEnviados = MensajeTicket::where('id_emisor_usuario', $user->id)
+            ->where('es_nota_interna', false)
+            ->count();
+
+        $calificacionPromedio = (clone $ticketsResueltosQuery)
             ->whereNotNull('calificacion_respuesta')
             ->avg('calificacion_respuesta');
 
         $ultimosTickets = TicketConsulta::with([
             'colaborador:id,nombre_completo,legajo,zona_geografica_establecimient',
             'curso:id_curso,nombre',
+            'mensajes' => function ($q) {
+                $q->where('es_nota_interna', false)
+                  ->orderByDesc('created_at');
+            },
         ])
-            ->where('id_admin_respondiente', $user->id)
+            ->withCount(['mensajes as total_mensajes' => function ($q) {
+                $q->where('es_nota_interna', false);
+            }])
+            ->where(function ($q) use ($user) {
+                // Trae tickets asignados a este admin o en los que participó respondiendo
+                $q->where('id_admin_asignado', $user->id)
+                  ->orWhereHas('mensajes', function ($m) use ($user) {
+                      $m->where('id_emisor_usuario', $user->id)
+                        ->where('es_nota_interna', false);
+                  });
+            })
             ->orderByDesc('updated_at')
             ->take(10)
             ->get();
@@ -119,6 +142,7 @@ class ProfileController extends Controller
                 'zona_geografica_establecimient' => $user->zona_geografica_establecimient,
                 'centro_costo'                   => $user->centro_costo,
                 'estado_operativo'               => $user->estado_operativo,
+                'disponible_soporte'             => (bool) $user->disponible_soporte,
                 'fecha_ingreso'                  => $user->fecha_ingreso ? Carbon::parse($user->fecha_ingreso)->format('d/m/Y') : '15/01/2026',
                 'id_microsoft_entra'             => $user->id_microsoft_entra,
                 'foto_url'                       => $user->foto ? Storage::url($user->foto) : null,
@@ -128,6 +152,8 @@ class ProfileController extends Controller
             'historialAdministradores' => $historialAdministradores,
             'metricasSoporte'          => [
                 'total_respondidos'     => $totalTicketsRespondidos,
+                'tickets_en_curso'        => $ticketsEnCurso,   
+                'total_mensajes_enviados' => $totalMensajesEnviados,
                 'calificacion_promedio' => $calificacionPromedio ? round((float) $calificacionPromedio, 1) : null,
                 'ultimos_tickets'       => $ultimosTickets,
             ],
@@ -207,13 +233,14 @@ class ProfileController extends Controller
     {
         $validated = $request->validate([
             'email_destino' => ['required', 'email'],
-            'tipo_prueba'   => ['required', 'in:curso,bloqueo,ambos'],
+            'tipo_prueba'   => ['required', 'in:curso,bloqueo,sla,ambos,todos'],
         ]);
 
         $admin = $request->user();
         $destino = $validated['email_destino'];
+        $tipo = $validated['tipo_prueba'];
 
-        if (in_array($validated['tipo_prueba'], ['curso', 'ambos'], true)) {
+        if (in_array($tipo, ['curso', 'ambos', 'todos'], true)) {
             $dataCurso = [
                 'creador_nombre'  => $admin->nombre_completo ?? 'Técnica en HyS',
                 'curso_nombre'    => 'Seguridad en Maquinaria Agrícola y Uso de EPP',
@@ -226,7 +253,7 @@ class ProfileController extends Controller
             Mail::to($destino)->send(new CursoEstadoActualizadoMail($dataCurso));
         }
 
-        if (in_array($validated['tipo_prueba'], ['bloqueo', 'ambos'], true)) {
+        if (in_array($tipo, ['bloqueo', 'ambos', 'todos'], true)) {
             $dataBloqueo = [
                 'operario_nombre' => 'Luis Alberto Salvatierra',
                 'operario_legajo' => '1042',
@@ -236,6 +263,22 @@ class ProfileController extends Controller
                 'ultima_nota'     => 40,
             ];
             Mail::to($destino)->send(new OperarioBloqueadoMail($dataBloqueo));
+        }
+
+        if (in_array($tipo, ['sla', 'todos'], true)) {
+            $dataSla = [
+                'destinatario_nombre' => $admin->nombre_completo ?? 'Equipo de Administración',
+                'mensaje_contexto'    => 'Tienes un ticket de consulta asignado a tu bandeja que lleva más de 48 horas sin ser marcado como Resuelto:',
+                'id_ticket'           => 104,
+                'asunto'              => 'Bloqueo en cuestionario módulo 1',
+                'categoria'           => 'Sistema / Cursos',
+                'operario_nombre'     => 'Luis Alberto Salvatierra',
+                'operario_legajo'     => '2005',
+                'nodo'                => $admin->zona_geografica_establecimient ?? 'Las Lajitas',
+                'horas_abierto'       => 52,
+                'estado'              => 'En Curso',
+            ];
+            
         }
 
         return Redirect::route('profile.edit')->with(
