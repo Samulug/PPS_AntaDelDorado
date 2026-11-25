@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import AppLayout from '@/Layouts/app-layout';
 import { useAuth } from '@/hooks/use-auth';
 import { Head, Link, router } from '@inertiajs/react';
@@ -16,7 +16,7 @@ import {
     Cell,
     Legend,
 } from 'recharts';
-
+import SearchableSelect, { type SelectOption } from '@/Components/SearchableSelect';
 // Interfaces de datos enviadas por DashboardController.php
 interface ColaboradorBloqueado {
     id_progreso: number;
@@ -107,6 +107,30 @@ export default function Dashboard({
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     const { can } = useAuth();
     
+    const opcionesZonas = useMemo<SelectOption[]>(() => {
+        const zonas = new Set<string>(ZONAS_DISPONIBLES);
+        if (zonaActual) zonas.add(zonaActual);
+
+        return [
+            { value: '', label: 'Todos' },
+            ...Array.from(zonas).map((zona) => ({
+                value: zona,
+                label: zona,
+            })),
+        ];
+    }, [zonaActual]);
+
+    const opcionesDepartamentos = useMemo<SelectOption[]>(() => {
+        const deptos = new Set<string>(DEPARTAMENTOS);
+        if (deptoFiltro) deptos.add(deptoFiltro);
+
+        return Array.from(deptos).map((dep) => ({
+            value: dep,
+            label: dep,
+        }));
+    }, [deptoFiltro]);
+
+
     const mostrarToast = (texto: string) => {
         setToastMsg(texto);
         setTimeout(() => setToastMsg(null), 2800);
@@ -219,37 +243,43 @@ export default function Dashboard({
 
             {/* 2. BARRA DE FILTROS EN TARJETA (Nodo productivo, Departamento, Rango de fechas) */}
             <div className="rounded-[12px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] px-7 py-6 flex flex-wrap items-end gap-5">
-                <label className="grid gap-2 text-[13px] font-medium text-[#6B7280] dark:text-[#9AA39D] min-w-[200px] flex-1 sm:flex-initial">
-                    Nodo productivo / Planta
-                    <select
-                        value={zonaActual}
-                        onChange={(e) => aplicarFiltrosDashboard({zona: e.target.value})}
-                        className="rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] px-3 py-[9px] text-[15px] font-normal text-[#1F2328] dark:text-[#ECEFEC] focus:border-[#2F6F5E] focus:outline-none focus:ring-3 focus:ring-[#EDF4F1] dark:focus:ring-[#223029]"
+                <div className="grid gap-2 min-w-[220px] flex-1 sm:flex-initial">
+                    <label
+                        htmlFor="dashboard-filtro-zona"
+                        className="text-[13px] font-medium text-[#6B7280] dark:text-[#9AA39D]"
                     >
-                        <option value="">Todos</option>
-                        {ZONAS_DISPONIBLES.map((zona) => (
-                            <option key={zona} value={zona}>
-                                {zona}
-                            </option>
-                        ))}
-                    </select>
-                </label>
-
-                <label className="grid gap-2 text-[13px] font-medium text-[#6B7280] dark:text-[#9AA39D] min-w-[180px] flex-1 sm:flex-initial">
-                    Departamento
-                    <select
-                        value={deptoFiltro}
-                        onChange={(e) => aplicarFiltrosDashboard({depto: e.target.value})}
-                        className="rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] px-3 py-[9px] text-[15px] font-normal text-[#1F2328] dark:text-[#ECEFEC] focus:border-[#2F6F5E] focus:outline-none focus:ring-3 focus:ring-[#EDF4F1] dark:focus:ring-[#223029]"
-                    >
-                        {DEPARTAMENTOS.map((dep) => (
-                            <option key={dep} value={dep}>
-                                {dep}
-                            </option>
-                        ))}
-                    </select>
-                </label>
-
+                        Nodo productivo / Planta
+                    </label>    
+                        <SearchableSelect
+                            id="dashboard-filtro-zona"
+                            options={opcionesZonas}
+                            value={zonaActual}
+                            onChange={(val) => aplicarFiltrosDashboard({ zona: val })}
+                            clearable={Boolean(zonaActual)}
+                            placeholder="Todos"
+                            searchPlaceholder="Buscar nodo..."
+                            emptyMessage="No se encontró ese nodo."
+                            ariaLabel="Filtrar por nodo productivo"
+                            maxVisibleOptions={5}
+                        />
+                </div>
+                <div className="grid gap-2 min-w-[200px] flex-1 sm:flex-initial">
+                    <label htmlFor="dashboard-filtro-depto" className="text-[13px] font-medium text-[#6B7280] dark:text-[#9AA39D]">                        
+                        Departamento
+                    </label>
+                        <SearchableSelect
+                            id="dashboard-filtro-depto"
+                            options={opcionesDepartamentos}
+                            value={deptoFiltro}
+                            onChange={(val) => aplicarFiltrosDashboard({ depto: val || 'Todos' })}
+                            clearable={deptoFiltro !== 'Todos'}
+                            placeholder="Todos"
+                            searchPlaceholder="Buscar departamento..."
+                            emptyMessage="No se encontró ese departamento."
+                            ariaLabel="Filtrar por departamento"
+                            maxVisibleOptions={5}
+                        />
+                </div>
                 <label className="grid gap-2 text-[13px] font-medium text-[#6B7280] dark:text-[#9AA39D] min-w-[160px] flex-1 sm:flex-initial">
                     Rango de fechas
                     <select
@@ -265,7 +295,7 @@ export default function Dashboard({
                     </select>
                 </label>
             </div>
-
+            
             {/* 3. TARJETAS DE MÉTRICAS RÁPIDAS (KPIs con tipografía 38px del prototipo) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 my-8">
                 {/* KPI 1: Colaboradores activos */}

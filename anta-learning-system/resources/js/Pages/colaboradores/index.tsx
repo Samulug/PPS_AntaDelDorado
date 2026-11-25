@@ -11,6 +11,7 @@ import {
     ChevronRight,
     X,
 } from 'lucide-react';
+import SearchableSelect, {type SelectOption} from '@/Components/SearchableSelect';
 
 interface Colaborador {
     id: number;
@@ -40,6 +41,8 @@ export default function ColaboradoresIndex({ users = [], filters = {} }: Props) 
     const { flash } = usePage<any>().props;
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     const { can } = useAuth();
+
+
 
     const triggerToast = (msg: string) => {
         setToastMsg(msg);
@@ -73,6 +76,23 @@ export default function ColaboradoresIndex({ users = [], filters = {} }: Props) 
         estado: 'Todos',
         soloBloqueados:false,
     });
+
+    const opcionesNodos = useMemo<SelectOption[]>(() => {
+        const nodosUnicos = new Set<string>(NODOS);
+        users.forEach((u) => {
+            if (u.zona_geografica_establecimient) {
+                nodosUnicos.add(u.zona_geografica_establecimient);
+            }
+        });
+
+        return [
+            { value: 'Todos', label: 'Todos' },
+            ...Array.from(nodosUnicos).map((n) => ({
+                value: n,
+                label: n,
+            })),
+        ];
+    }, [users]);
 
     const [colabPage, setColabPage] = useState(1);
     const [colabPerPage, setColabPerPage] = useState(5);
@@ -111,8 +131,6 @@ export default function ColaboradoresIndex({ users = [], filters = {} }: Props) 
     const processedColabs = useMemo(() => {
         const q = colabApplied.search.toLowerCase().trim();
 
-        
-
         const filtered = users.filter((u) => {
             const matchText =
                 !q ||
@@ -132,10 +150,6 @@ export default function ColaboradoresIndex({ users = [], filters = {} }: Props) 
         });
 
         filtered.sort((a, b) => {
-            const bloqA = (a.cursos_bloqueados_count ?? 0) > 0 ? 1 : 0;
-            const bloqB = (b.cursos_bloqueados_count ?? 0) > 0 ? 1 : 0;
-            if (bloqA !== bloqB) return bloqB - bloqA;
-
             const cmp = a.nombre_completo.localeCompare(b.nombre_completo, 'es', {
                 sensitivity: 'base',
             });
@@ -291,18 +305,21 @@ export default function ColaboradoresIndex({ users = [], filters = {} }: Props) 
                             </select>
 
                             <span className="text-[13px] text-[#6B7280] dark:text-[#9AA39D] shrink-0">Nodo:</span>
-                            <select
-                                value={colabDraft.nodo}
-                                onChange={(e) => setColabDraft({ ...colabDraft, nodo: e.target.value })}
-                                className="py-[7px] min-h-[38px] rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[#1F2328] dark:text-[#ECEFEC] text-[13px] px-2"
-                            >
-                                <option value="Todos">Todos</option>
-                                {NODOS.map((n) => (
-                                    <option key={n} value={n}>
-                                        {n}
-                                    </option>
-                                ))}
-                            </select>
+                            <div className="w-[185px] shrink-0">
+                                <SearchableSelect
+                                    options={opcionesNodos}
+                                    value={colabDraft.nodo}
+                                    onChange={(val) =>
+                                        setColabDraft((prev) => ({ ...prev, nodo: val || 'Todos' }))
+                                    }
+                                    clearable={colabDraft.nodo !== 'Todos'}
+                                    placeholder="Todos"
+                                    searchPlaceholder="Buscar nodo..."
+                                    emptyMessage="No se encontró ese nodo."
+                                    ariaLabel="Filtrar por nodo"
+                                    maxVisibleOptions={5}
+                                />
+                            </div>
 
                             <span className="text-[13px] text-[#6B7280] dark:text-[#9AA39D] shrink-0">Estado:</span>
                             <select

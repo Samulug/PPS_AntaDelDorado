@@ -4,6 +4,7 @@ import axios from 'axios';
 import AppLayout from '@/Layouts/app-layout';
 import { useAuth } from '@/hooks/use-auth';
 import { useSupabaseRealtime } from '@/hooks/use-supabase-realtime';
+import SearchableSelect, {type SelectOption} from '@/Components/SearchableSelect';
 
 interface ColaboradorInfo {
     id: number;
@@ -166,6 +167,31 @@ export default function ConsultasIndex({
         });
         return Array.from(cats);
     }, [tickets]);
+
+    // Opciones para el filtro de áreas
+    const opcionesAreas = useMemo<SelectOption[]>(() => {
+        return [
+            { value: 'TODAS', label: 'Todas las áreas' },
+            ...categoriasDisponibles.map((cat) => ({
+                value: cat,
+                label: `Área: ${cat}`,
+            })),
+        ];
+    }, [categoriasDisponibles]);
+
+    // Opciones para el modal de derivación de administradores
+    const opcionesAdministradores = useMemo<SelectOption[]>(() => {
+        return administradores.map((adm) => ({
+            value: String(adm.id),
+            label: adm.nombre_completo,
+            description: `${adm.rol} · ${
+                adm.disponible_soporte ? '● En turno' : '○ Fuera de turno'
+            }${adm.zona_geografica_establecimient ? ` · ${adm.zona_geografica_establecimient}` : ''}`,
+            keywords: `${adm.email || ''} ${adm.rol} ${
+                adm.disponible_soporte ? 'en turno' : 'fuera de turno'
+            }`,
+        }));
+    }, [administradores]);
 
     // Contadores para los botones de estado
     const contadoresBandeja = useMemo(() => {
@@ -447,19 +473,16 @@ export default function ConsultasIndex({
                         </div>
 
                         {/* Select de Filtrado por Área */}
-                        <select
+                       <SearchableSelect
+                            options={opcionesAreas}
                             value={categoriaFiltro}
-                            onChange={(e) => setCategoriaFiltro(e.target.value)}
-                            aria-label="Filtrar por área"
-                            className="w-full min-w-0 px-3 py-2 rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#141714] text-[13px] text-[#1F2328] dark:text-[#ECEFEC] focus:outline-none focus:border-[#2F6F5E]"
-                        >
-                            <option value="TODAS">Todas las áreas</option>
-                            {categoriasDisponibles.map((cat) => (
-                                <option key={cat} value={cat}>
-                                    Área: {cat}
-                                </option>
-                            ))}
-                        </select>
+                            onChange={(val) => setCategoriaFiltro(val || 'TODAS')}
+                            placeholder="Todas las áreas"
+                            searchPlaceholder="Buscar área..."
+                            emptyMessage="No se encontró esa área."
+                            ariaLabel="Filtrar por área"
+                            maxVisibleOptions={5}
+                        />
 
                         {/* Botón para filtrar únicamente los tickets no asignados */}
                         <button
@@ -846,23 +869,24 @@ export default function ConsultasIndex({
                         </div>
 
                         <form onSubmit={handleConfirmarDerivacion} className="space-y-4 sm:space-y-5">
-                            <label className="grid gap-1.5 text-[14px] font-medium text-[#6B7280] dark:text-[#9AA39D]">
-                                Administrador destino
-                                <select
-                                    required
-                                    value={adminDestinoId}
-                                    onChange={(e) => setAdminDestinoId(e.target.value)}
-                                    className="w-full min-w-0 px-3 py-2 rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#141714] text-[#1F2328] dark:text-[#ECEFEC] text-[14px]"
-                                >
-                                    <option value="">Seleccionar administrador...</option>
-                                    {administradores.map((adm) => (
-                                        <option key={adm.id} value={adm.id}>
-                                            {adm.nombre_completo} ({adm.rol}){' '}
-                                            {adm.disponible_soporte ? '· En turno' : '· Fuera de turno'}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
+                            <div className="grid gap-1.5">
+                                <label className="grid gap-1.5 text-[14px] font-medium text-[#6B7280] dark:text-[#9AA39D]">
+                                    Administrador destino
+                                </label>
+                                    <SearchableSelect
+                                        id="select-admin-destino"
+                                        name="id_admin_destino"
+                                        required
+                                        clearable
+                                        options={opcionesAdministradores}
+                                        value={adminDestinoId}
+                                        onChange={setAdminDestinoId}
+                                        placeholder="Seleccionar administrador..."
+                                        searchPlaceholder="Buscar por nombre, rol o turno..."
+                                        emptyMessage="No se encontraron administradores."
+                                        maxVisibleOptions={5}
+                                    />
+                            </div>
 
                             <label className="grid gap-1.5 text-[13.5px] font-medium text-[#6B7280] dark:text-[#9AA39D]">
                                 Nota interna (opcional)

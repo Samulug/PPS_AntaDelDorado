@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import SearchableSelect, {type SelectOption} from '@/Components/SearchableSelect';
 import axios from 'axios';
 import { useAuth } from '@/hooks/use-auth';
 import { Head, Link, router, usePage } from '@inertiajs/react';
@@ -128,6 +129,23 @@ export default function CuadrillasIndex({
         nodo: 'Todos',
         estado: 'Todos',
     });
+
+    const opcionesNodos = useMemo<SelectOption[]>(() => {
+        const nodosUnicos = new Set<string>(NODOS);
+        users.forEach((u) => {
+            if (u.zona_geografica_establecimient) {
+                nodosUnicos.add(u.zona_geografica_establecimient);
+            }
+        });
+
+        return [
+            { value: 'Todos', label: 'Todos' },
+            ...Array.from(nodosUnicos).map((n) => ({
+                value: n,
+                label: n,
+            })),
+        ];
+    }, [users]);
 
     const [cuadPage, setCuadPage] = useState(1);
     const [cuadPerPage, setCuadPerPage] = useState(5);
@@ -673,20 +691,21 @@ const processedCuadrillas = useMemo(() => {
                         </select>
 
                         <span className="text-[14px]">Nodo:</span>
-                        <select
-                            value={cuadDraft.nodo}
-                            onChange={(e) =>
-                                setCuadDraft({ ...cuadDraft, nodo: e.target.value })
-                            }
-                            className="py-[7px] min-h-[38px] rounded-[8px] border border-[#E9E9E7] dark:border-[#2A302B] bg-white dark:bg-[#1B1F1C] text-[14px] px-2"
-                        >
-                            <option value="Todos">Todos</option>
-                            {NODOS.map((n) => (
-                                <option key={n} value={n}>
-                                    {n}
-                                </option>
-                            ))}
-                        </select>
+                        <div className="w-[185px] shrink-0">
+                            <SearchableSelect
+                                options={opcionesNodos}
+                                value={cuadDraft.nodo}
+                                onChange={(val) =>
+                                    setCuadDraft((prev) => ({ ...prev, nodo: val || 'Todos' }))
+                                }
+                                clearable={cuadDraft.nodo !== 'Todos'}
+                                placeholder="Todos"
+                                searchPlaceholder="Buscar nodo..."
+                                emptyMessage="No se encontró ese nodo."
+                                ariaLabel="Filtrar por nodo"
+                                maxVisibleOptions={5}
+                            />
+                        </div>
 
                         <span className="text-[14px]">Estado:</span>
                         <select
